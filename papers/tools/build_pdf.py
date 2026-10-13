@@ -61,10 +61,10 @@ CJK_BODY_INDEX = 4
 
 def register_fonts(lang: str) -> dict:
     """Register the fonts one language needs and return their names."""
+    pdfmetrics.registerFont(TTFont("Song", CJK_SERIF, subfontIndex=CJK_BODY_INDEX))
+    pdfmetrics.registerFont(TTFont("SongBold", CJK_SERIF, subfontIndex=CJK_BOLD_INDEX))
+    pdfmetrics.registerFontFamily("Song", normal="Song", bold="SongBold", italic="Song", boldItalic="SongBold")
     if lang == "zh":
-        pdfmetrics.registerFont(TTFont("Song", CJK_SERIF, subfontIndex=CJK_BODY_INDEX))
-        pdfmetrics.registerFont(TTFont("SongBold", CJK_SERIF, subfontIndex=CJK_BOLD_INDEX))
-        pdfmetrics.registerFontFamily("Song", normal="Song", bold="SongBold", italic="Song", boldItalic="SongBold")
         return {"body": "Song", "bold": "SongBold", "italic": "Song", "mono": "Courier"}
     return {"body": "Times-Roman", "bold": "Times-Bold", "italic": "Times-Italic", "mono": "Courier"}
 
@@ -105,11 +105,21 @@ INLINE = [
 ]
 
 
+CJK_RUN = re.compile(r"[\u2e80-\u9fff\uff00-\uffef]+")
+
+
 def inline(text: str, fonts: dict) -> str:
-    """Convert the little inline Markdown the manuscripts use into mini-HTML."""
+    """Convert the little inline Markdown the manuscripts use into mini-HTML.
+
+    The English manuscript quotes a few Chinese literals from the interface; a
+    Times face has no glyphs for them, so each CJK run is wrapped in the CJK face
+    registered for that purpose. Without this the quotes vanish from the page.
+    """
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     for pattern, replacement in INLINE:
         text = pattern.sub(replacement, text)
+    if fonts["body"] != "Song":
+        text = CJK_RUN.sub(lambda match: f'<font face="Song">{match.group(0)}</font>', text)
     return text
 
 
