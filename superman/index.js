@@ -15,9 +15,10 @@
  * `API.md` for the frozen browser contract.
  */
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { extractPdfText } from './pdf.js';
 
 /** Services this bundle needs; `attachments` is optional and read on demand. */
 export const inject = ['connection'];
@@ -32,6 +33,24 @@ const MAX_NOTE_CHARS = 8000;
 const MAX_FILE_BYTES = 64 * 1024 * 1024;
 /** Items whose names the prompt digest lists. */
 const DIGEST_ITEMS = 24;
+/** Items the compaction policy keeps before the oldest are evicted. */
+const DEFAULT_MAX_ITEMS = 2000;
+/** Total bytes the compaction policy keeps before the oldest are evicted. */
+const DEFAULT_MAX_BYTES = 512 * 1024 * 1024;
+/** Pages the PDF reader replays before it stops. */
+const MAX_PDF_PAGES = 200;
+/** Characters of PDF text the reader keeps before it stops. */
+const MAX_PDF_TEXT_CHARS = 400_000;
+/** BM25's term-saturation constant. */
+const BM25_K1 = 1.2;
+/** BM25's length-normalisation constant. */
+const BM25_B = 0.75;
+/** How much heavier one hit in a name (or record title) weighs than in a body. */
+const NAME_WEIGHT = 3;
+/** Most a document's recency can add to its score. */
+const RECENCY_MAX = 1.5;
+/** The window over which recency fades, in milliseconds. */
+const RECENCY_WINDOW = 1000 * 60 * 60 * 24 * 30;
 
 /** Extensions that identify code or a program file. */
 const CODE_EXTENSIONS = new Set([
@@ -167,20 +186,88 @@ function categorize(name, mime, bytes) {
 	return { category: 'other', mime: declared || 'application/octet-stream' };
 }
 
-/** Split a query into latin words and CJK characters plus bigrams. */
-function tokenize(text) {
+/** Split a text into latin words and CJK characters plus bigrams, keeping repeats. */
+function tokensOf(text) {
 	const lowered = String(text ?? '').toLowerCase();
-	const tokens = new Set();
+	const tokens = [];
 	for (const word of lowered.split(/[^a-z0-9_+#.]+/u)) {
-		if (word.length >= 2 && word.length <= 40) tokens.add(word);
+		if (word.length >= 2 && word.length <= 40) tokens.push(word);
 	}
 	const cjk = lowered.match(/[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/gu) ?? [];
 	for (const [index, character] of cjk.entries()) {
-		tokens.add(character);
+		tokens.push(character);
 		const next = cjk[index + 1];
-		if (next !== undefined) tokens.add(`${character}${next}`);
+		if (next !== undefined) tokens.push(`${character}${next}`);
 	}
-	return [...tokens];
+	return tokens;
+}
+
+/** Split a query into latin words and CJK characters plus bigrams, without repeats. */
+function tokenize(text) {
+	return [...new Set(tokensOf(text))];
+}
+
+/** The BM25 inverse document frequency of one term. */
+function idf(documentFrequency, total) {
+	return Math.log(1 + (total - documentFrequency + 0.5) / (documentFrequency + 0.5));
+}
+
+/**
+ * The weighted token frequencies and length of one document.
+ * @param parts - `[text, weight]` pairs; a name weighs above its body.
+ * @returns the term frequencies and the length BM25 normalises by.
+ */
+function documentVector(parts) {
+	const frequency = new Map();
+	let length = 0;
+	for (const [text, weight] of parts) {
+		for (const token of tokensOf(text)) {
+			frequency.set(token, (frequency.get(token) ?? 0) + weight);
+			length += weight;
+		}
+	}
+	return { frequency, length };
+}
+
+/**
+ * Rank the corpus against one query with BM25.
+ *
+ * Document frequencies come from the whole memory, so a term every document
+ * carries contributes almost nothing while a rare term dominates, and a long
+ * body is normalised against the corpus's average length.
+ * @param documents - the corpus, each with a weighted `vector`.
+ * @param tokens - the query's tokens, without repeats.
+ * @returns `{ index, score }` for the matching documents, best first.
+ */
+function bm25Rank(documents, tokens) {
+	if (documents.length === 0 || tokens.length === 0) return [];
+	let totalLength = 0;
+	for (const document of documents) totalLength += document.vector.length;
+	const average = totalLength / documents.length || 1;
+	const frequencies = new Map();
+	for (const token of tokens) {
+		let count = 0;
+		for (const document of documents) if (document.vector.frequency.has(token)) count += 1;
+		frequencies.set(token, count);
+	}
+	const ranked = [];
+	for (const [index, document] of documents.entries()) {
+		let score = 0;
+		for (const token of tokens) {
+			const frequency = document.vector.frequency.get(token);
+			if (frequency === undefined) continue;
+			const weight = idf(frequencies.get(token), documents.length);
+			const norm = frequency + BM25_K1 * (1 - BM25_B + BM25_B * (document.vector.length / average));
+			score += weight * (frequency * (BM25_K1 + 1)) / norm;
+		}
+		if (score > 0) ranked.push({ index, score });
+	}
+	return ranked.sort((left, right) => right.score - left.score);
+}
+
+/** How much a document's age adds to its score. */
+function recencyBonus(addedAt) {
+	return Math.min(RECENCY_MAX, Math.max(0, 1 - (Date.now() - addedAt) / RECENCY_WINDOW));
 }
 
 /** A short human size. */
@@ -194,20 +281,46 @@ function humanBytes(bytes) {
  * The Superman memory store: one JSON index plus the original files.
  */
 class SupermanStore {
-	/** @param root - the memory directory. */
-	constructor(root) {
+	/**
+	 * @param root - the memory directory.
+	 * @param options - optional `maxItems` / `maxBytes` compaction caps.
+	 */
+	constructor(root, options = {}) {
 		this.root = root;
 		this.filesDir = join(root, 'files');
 		this.indexPath = join(root, 'index.json');
 		this.index = { version: INDEX_VERSION, items: [], notes: [] };
 		this.loaded = false;
-		/** Serializes writes so two uploads cannot clobber the index. */
+		/** Items kept; the oldest are evicted past this. */
+		this.maxItems = Number.isFinite(options.maxItems) && options.maxItems > 0 ? Math.floor(options.maxItems) : DEFAULT_MAX_ITEMS;
+		/** Total bytes kept; the oldest are evicted past this. */
+		this.maxBytes = Number.isFinite(options.maxBytes) && options.maxBytes > 0 ? Math.floor(options.maxBytes) : DEFAULT_MAX_BYTES;
+		/** Serializes index writes so two uploads cannot clobber the index. */
 		this.writing = Promise.resolve();
+		/** Serializes whole mutations, so read-modify-write cycles cannot interleave. */
+		this.queue = Promise.resolve();
+		/** Set once the index has been reconciled against the directory. */
+		this.reconciled = false;
+		/** Items the compaction policy has evicted since this store was built. */
+		this.evicted = 0;
+		/** Files reconciliation removed because no index entry referenced them. */
+		this.orphanFiles = 0;
 	}
 
-	/** Read the index from disk once. */
+	/** Read the index from disk once, then reconcile it with the directory. */
 	async load() {
 		if (this.loaded) return;
+		const pending = this.loading ?? (this.loading = this.open());
+		try {
+			await pending;
+		} catch (error) {
+			this.loading = undefined;
+			throw error;
+		}
+	}
+
+	/** Read the index, then run startup reconciliation. */
+	async open() {
 		await mkdir(this.filesDir, { recursive: true });
 		if (existsSync(this.indexPath)) {
 			try {
@@ -218,6 +331,57 @@ class SupermanStore {
 			}
 		}
 		this.loaded = true;
+		await this.reconcile();
+	}
+
+	/**
+	 * Match the index against `files/`: an entry whose file vanished is dropped,
+	 * a file no entry references is deleted, and the index is rewritten once when
+	 * either happened. A file an entry still references is never deleted.
+	 */
+	async reconcile() {
+		let changed = false;
+		const kept = [];
+		for (const item of this.index.items) {
+			if (typeof item?.id !== 'string' || item.id === '' || !existsSync(join(this.filesDir, item.id))) {
+				changed = true;
+				continue;
+			}
+			kept.push(item);
+		}
+		if (changed) this.index.items = kept;
+		const referenced = new Set(this.index.items.map((item) => item.id));
+		let entries = [];
+		try {
+			entries = await readdir(this.filesDir, { withFileTypes: true });
+		} catch {
+			entries = [];
+		}
+		let orphans = 0;
+		for (const entry of entries) {
+			if (!entry.isFile() || referenced.has(entry.name)) continue;
+			try {
+				await rm(join(this.filesDir, entry.name), { force: true });
+				orphans += 1;
+			} catch {
+				/* a file we cannot remove is retried at the next start */
+			}
+		}
+		this.orphanFiles += orphans;
+		if (orphans > 0) changed = true;
+		this.reconciled = true;
+		if (changed) await this.save();
+	}
+
+	/**
+	 * Run one index-mutating operation after every operation already queued.
+	 * @param work - the operation to run.
+	 * @returns the operation's own result.
+	 */
+	locked(work) {
+		const result = this.queue.then(() => work());
+		this.queue = result.then(() => undefined, () => undefined);
+		return result;
 	}
 
 	/** Write the index atomically. */
@@ -232,91 +396,164 @@ class SupermanStore {
 	}
 
 	/**
+	 * Evict the oldest items until both caps hold, removing each evicted file.
+	 * The item just stored is never the one evicted, so one oversized upload
+	 * still stores.
+	 * @param protectId - the id that must survive this pass.
+	 * @returns the evicted items, oldest first.
+	 */
+	async compact(protectId) {
+		const evicted = [];
+		let bytes = this.index.items.reduce((total, item) => total + (Number.isFinite(item.bytes) ? item.bytes : 0), 0);
+		while (this.index.items.length > this.maxItems || bytes > this.maxBytes) {
+			const victim = [...this.index.items].sort((left, right) => (left.addedAt ?? 0) - (right.addedAt ?? 0)).find((item) => item.id !== protectId);
+			if (victim === undefined) break;
+			this.index.items = this.index.items.filter((item) => item.id !== victim.id);
+			bytes -= Number.isFinite(victim.bytes) ? victim.bytes : 0;
+			await rm(join(this.filesDir, victim.id), { force: true });
+			this.evicted += 1;
+			evicted.push({ id: victim.id, name: victim.name, category: victim.category, bytes: victim.bytes, addedAt: victim.addedAt });
+		}
+		return evicted;
+	}
+
+	/**
+	 * The searchable text of one upload: the caller's text, the file's own
+	 * bytes, or the text layer the PDF reader recovers. A PDF the reader cannot
+	 * parse keeps no text instead of failing the store.
+	 * @param input - the store request.
+	 * @param classified - the classifier's verdict.
+	 * @param bytes - the file bytes.
+	 * @returns the text to index and the PDF page count when the reader found one.
+	 */
+	async textOf(input, classified, bytes) {
+		if (typeof input.text === 'string' && input.text.trim() !== '') {
+			return { text: input.text.slice(0, MAX_PREVIEW_CHARS), pages: 0 };
+		}
+		if (classified.category === 'pdf') {
+			try {
+				const extracted = await extractPdfText(bytes, { maxPages: MAX_PDF_PAGES, maxTextChars: MAX_PDF_TEXT_CHARS, maxChars: MAX_PDF_TEXT_CHARS });
+				return { text: extracted.text.slice(0, MAX_PDF_TEXT_CHARS), pages: extracted.pages ?? 0 };
+			} catch {
+				return { text: '', pages: 0 };
+			}
+		}
+		if (classified.category === 'code' || classified.category === 'other') {
+			return { text: decodeText(bytes.subarray(0, 32 * 1024)).slice(0, MAX_PREVIEW_CHARS), pages: 0 };
+		}
+		return { text: '', pages: 0 };
+	}
+
+	/**
 	 * Store one file.
 	 * @param input - name, mime, bytes, source, origin, and optional extracted text.
-	 * @returns the stored item.
+	 * @returns the stored item and whatever the caps evicted for it.
 	 */
 	async store(input) {
-		await this.load();
-		const bytes = input.bytes;
-		const digest = createHash('sha256').update(bytes).digest('hex');
-		const classified = categorize(input.name, input.mime, bytes);
-		const existing = this.index.items.find((item) => item.sha256 === digest && item.name === input.name);
-		if (existing !== undefined) {
-			existing.addedAt = Date.now();
-			if (input.source !== undefined) existing.source = input.source;
+		return this.locked(async () => {
+			await this.load();
+			const bytes = input.bytes;
+			const digest = createHash('sha256').update(bytes).digest('hex');
+			const classified = categorize(input.name, input.mime, bytes);
+			const existing = this.index.items.find((item) => item.sha256 === digest && item.name === input.name);
+			if (existing !== undefined) {
+				existing.addedAt = Date.now();
+				if (input.source !== undefined) existing.source = input.source;
+				await this.save();
+				return { item: existing, evicted: [] };
+			}
+			const id = digest.slice(0, 16);
+			await writeFile(join(this.filesDir, id), bytes);
+			const extracted = await this.textOf(input, classified, bytes);
+			const text = extracted.text;
+			const item = {
+				id,
+				name: basename(String(input.name ?? 'file')),
+				category: classified.category,
+				mime: classified.mime,
+				bytes: bytes.length,
+				addedAt: Date.now(),
+				source: input.source ?? 'superman',
+				...(input.origin === undefined ? {} : { origin: input.origin }),
+				detail: classified.category === 'pdf' && extracted.pages > 0
+					? `${extracted.pages} 页 · ${humanBytes(bytes.length)}`
+					: classified.category === 'image' && classified.width !== undefined
+						? `${classified.width}×${classified.height} · ${humanBytes(bytes.length)}`
+						: humanBytes(bytes.length),
+				sha256: digest,
+				hasText: text !== '',
+				textLength: text.length,
+				...(classified.width === undefined ? {} : { width: classified.width, height: classified.height }),
+				...(classified.category === 'pdf' && extracted.pages > 0 ? { pages: extracted.pages } : {}),
+				text,
+			};
+			this.index.items.push(item);
+			const evicted = await this.compact(item.id);
 			await this.save();
-			return existing;
-		}
-		const id = digest.slice(0, 16);
-		await writeFile(join(this.filesDir, id), bytes);
-		const text = typeof input.text === 'string' && input.text.trim() !== ''
-			? input.text.slice(0, MAX_PREVIEW_CHARS)
-			: classified.category === 'code' || classified.category === 'other' ? decodeText(bytes.subarray(0, 32 * 1024)).slice(0, MAX_PREVIEW_CHARS) : '';
-		const item = {
-			id,
-			name: basename(String(input.name ?? 'file')),
-			category: classified.category,
-			mime: classified.mime,
-			bytes: bytes.length,
-			addedAt: Date.now(),
-			source: input.source ?? 'superman',
-			...(input.origin === undefined ? {} : { origin: input.origin }),
-			detail: classified.category === 'image' && classified.width !== undefined
-				? `${classified.width}×${classified.height} · ${humanBytes(bytes.length)}`
-				: humanBytes(bytes.length),
-			sha256: digest,
-			hasText: text !== '',
-			textLength: text.length,
-			...(classified.width === undefined ? {} : { width: classified.width, height: classified.height }),
-			text,
-		};
-		this.index.items.push(item);
-		await this.save();
-		return item;
+			return { item, evicted };
+		});
 	}
 
 	/** Create or replace one conversation/task record. */
 	async note(input) {
-		await this.load();
-		const id = String(input.id ?? randomUUID());
-		const existing = this.index.notes.find((note) => note.id === id);
-		const now = Date.now();
-		const next = {
-			id,
-			kind: input.kind === 'conversation' ? 'conversation' : 'task',
-			title: String(input.title ?? '未命名').slice(0, 200),
-			text: String(input.text ?? '').slice(0, MAX_NOTE_CHARS),
-			source: String(input.source ?? 'unknown'),
-			...(input.sessionId === undefined ? {} : { sessionId: String(input.sessionId) }),
-			createdAt: existing?.createdAt ?? now,
-			updatedAt: now,
-			tags: Array.isArray(input.tags) ? input.tags.slice(0, 12).map((tag) => String(tag).slice(0, 40)) : [],
-		};
-		if (existing === undefined) this.index.notes.push(next);
-		else Object.assign(existing, next);
-		if (this.index.notes.length > 500) this.index.notes = this.index.notes.slice(-500);
-		await this.save();
-		return next;
+		return this.locked(async () => {
+			await this.load();
+			const id = String(input.id ?? randomUUID());
+			const existing = this.index.notes.find((note) => note.id === id);
+			const now = Date.now();
+			const next = {
+				id,
+				kind: input.kind === 'conversation' ? 'conversation' : 'task',
+				title: String(input.title ?? '未命名').slice(0, 200),
+				text: String(input.text ?? '').slice(0, MAX_NOTE_CHARS),
+				source: String(input.source ?? 'unknown'),
+				...(input.sessionId === undefined ? {} : { sessionId: String(input.sessionId) }),
+				createdAt: existing?.createdAt ?? now,
+				updatedAt: now,
+				tags: Array.isArray(input.tags) ? input.tags.slice(0, 12).map((tag) => String(tag).slice(0, 40)) : [],
+			};
+			if (existing === undefined) this.index.notes.push(next);
+			else Object.assign(existing, next);
+			if (this.index.notes.length > 500) this.index.notes = this.index.notes.slice(-500);
+			await this.save();
+			return next;
+		});
 	}
 
 	/** Remove one item or note, and its file. */
 	async delete(id) {
-		await this.load();
-		const item = this.index.items.find((entry) => entry.id === id);
-		if (item !== undefined) {
-			this.index.items = this.index.items.filter((entry) => entry.id !== id);
-			await rm(join(this.filesDir, item.id), { force: true });
-			await this.save();
-			return true;
-		}
-		const before = this.index.notes.length;
-		this.index.notes = this.index.notes.filter((entry) => entry.id !== id);
-		if (this.index.notes.length !== before) {
-			await this.save();
-			return true;
-		}
-		return false;
+		return this.locked(async () => {
+			await this.load();
+			const item = this.index.items.find((entry) => entry.id === id);
+			if (item !== undefined) {
+				this.index.items = this.index.items.filter((entry) => entry.id !== id);
+				await rm(join(this.filesDir, item.id), { force: true });
+				await this.save();
+				return true;
+			}
+			const before = this.index.notes.length;
+			this.index.notes = this.index.notes.filter((entry) => entry.id !== id);
+			if (this.index.notes.length !== before) {
+				await this.save();
+				return true;
+			}
+			return false;
+		});
+	}
+
+	/**
+	 * Run the compaction policy on demand.
+	 * @returns how many items left, the bytes they freed, and what remains.
+	 */
+	async prune() {
+		return this.locked(async () => {
+			await this.load();
+			const before = this.index.items.reduce((total, item) => total + (Number.isFinite(item.bytes) ? item.bytes : 0), 0);
+			const evicted = await this.compact();
+			if (evicted.length > 0) await this.save();
+			const bytes = this.index.items.reduce((total, item) => total + (Number.isFinite(item.bytes) ? item.bytes : 0), 0);
+			return { removed: evicted.length, freedBytes: before - bytes, items: this.index.items.length, bytes };
+		});
 	}
 
 	/** Read one item's bytes. */
@@ -324,7 +561,7 @@ class SupermanStore {
 		return readFile(join(this.filesDir, item.id));
 	}
 
-	/** Category counts, sizes, and note count. */
+	/** Category counts, sizes, note count, and the policy's own counters. */
 	stats() {
 		const categories = { pdf: 0, image: 0, code: 0, other: 0 };
 		let bytes = 0;
@@ -332,11 +569,15 @@ class SupermanStore {
 			categories[item.category] = (categories[item.category] ?? 0) + 1;
 			bytes += item.bytes;
 		}
-		return { total: this.index.items.length, bytes, notes: this.index.notes.length, categories };
+		return { total: this.index.items.length, bytes, notes: this.index.notes.length, categories, evicted: this.evicted, orphanFiles: this.orphanFiles };
 	}
 
 	/**
-	 * Score every item and note against a query and return the best matches.
+	 * Score every item and note against a query with BM25 and return the best.
+	 *
+	 * The name (or record title) weighs three times its body, a small recency
+	 * bonus keeps equally relevant material fresh-first, and the corpus is
+	 * scored as a whole so a term every document carries says almost nothing.
 	 * @param query - the text to recall for.
 	 * @param limit - how many matches to return.
 	 * @returns scored matches with snippets.
@@ -344,31 +585,27 @@ class SupermanStore {
 	recall(query, limit = 6) {
 		const tokens = tokenize(query);
 		if (tokens.length === 0) return [];
-		const scored = [];
+		const documents = [];
 		for (const item of this.index.items) {
-			const haystack = `${item.name}\n${item.category}\n${item.text ?? ''}`.toLowerCase();
-			let score = 0;
-			for (const token of tokens) {
-				if (item.name.toLowerCase().includes(token)) score += 4;
-				const at = haystack.indexOf(token);
-				if (at !== -1) {
-					score += token.length >= 2 ? 1.5 : 0.6;
-					if ((haystack.match(new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length > 3) score += 0.5;
-				}
-			}
-			if (score === 0) continue;
-			score += Math.min(1.5, Math.max(0, 1 - (Date.now() - item.addedAt) / (1000 * 60 * 60 * 24 * 30)));
-			scored.push({ id: item.id, kind: 'item', name: item.name, category: item.category, score, snippet: snippetOf(item.text ?? '', tokens), bytes: item.bytes, addedAt: item.addedAt, source: item.source });
+			documents.push({
+				addedAt: item.addedAt,
+				text: item.text ?? '',
+				vector: documentVector([[item.name, NAME_WEIGHT], [item.text ?? '', 1]]),
+				match: { id: item.id, kind: 'item', name: item.name, category: item.category, bytes: item.bytes, addedAt: item.addedAt, source: item.source },
+			});
 		}
 		for (const note of this.index.notes) {
-			const haystack = `${note.title}\n${note.text}`.toLowerCase();
-			let score = 0;
-			for (const token of tokens) {
-				if (note.title.toLowerCase().includes(token)) score += 3;
-				if (haystack.includes(token)) score += token.length >= 2 ? 1.2 : 0.5;
-			}
-			if (score === 0) continue;
-			scored.push({ id: note.id, kind: 'note', name: note.title, category: 'dialog', score, snippet: snippetOf(note.text, tokens), bytes: note.text.length, addedAt: note.updatedAt, source: note.source });
+			documents.push({
+				addedAt: note.updatedAt,
+				text: note.text,
+				vector: documentVector([[note.title, NAME_WEIGHT], [note.text, 1]]),
+				match: { id: note.id, kind: 'note', name: note.title, category: 'dialog', bytes: note.text.length, addedAt: note.updatedAt, source: note.source },
+			});
+		}
+		const scored = [];
+		for (const ranked of bm25Rank(documents, tokens)) {
+			const document = documents[ranked.index];
+			scored.push({ ...document.match, score: ranked.score + recencyBonus(document.addedAt), snippet: snippetOf(document.text, tokens) });
 		}
 		return scored.sort((left, right) => right.score - left.score).slice(0, Math.max(1, Math.min(20, limit)));
 	}
@@ -434,6 +671,9 @@ function collectAttachments(value, found, depth = 0) {
 	return found;
 }
 
+/** Helpers the offline check drives directly; the Host never reads them. */
+export const internal = { categorize, tokenize, idf, documentVector, bm25Rank, recencyBonus, SupermanStore };
+
 /**
  * Register the Superman memory.
  * @param ctx - the Host plugin context.
@@ -442,7 +682,7 @@ function collectAttachments(value, found, depth = 0) {
 export function apply(ctx, config) {
 	const root = String(config?.root ?? 'superman');
 	const recallLimit = Number.isFinite(Number(config?.recallLimit)) ? Number(config.recallLimit) : 6;
-	const store = new SupermanStore(root);
+	const store = new SupermanStore(root, { maxItems: Number(config?.maxItems), maxBytes: Number(config?.maxBytes) });
 	/** Attachment ids already copied into the memory, so a session log cannot re-add them. */
 	const ingested = new Set();
 	/** Per-session record state, kept only in memory. */
@@ -465,7 +705,7 @@ export function apply(ctx, config) {
 			const bytes = Buffer.from(body.base64, 'base64');
 			if (bytes.length === 0) throw Object.assign(new Error('the payload is empty'), { code: 'bad-request' });
 			if (bytes.length > MAX_FILE_BYTES) throw Object.assign(new Error('the file is too large'), { code: 'too-large' });
-			const item = await store.store({
+			const { item, evicted } = await store.store({
 				name: body.name,
 				mime: body.mime,
 				bytes,
@@ -474,7 +714,7 @@ export function apply(ctx, config) {
 				text: body.text,
 			});
 			const { text, ...rest } = item;
-			return { item: { ...rest, hasText: text !== undefined && text !== '' } };
+			return { item: { ...rest, hasText: text !== undefined && text !== '' }, evicted };
 		}
 		if (action === 'note') {
 			const note = await store.note(body?.note ?? {});
@@ -498,6 +738,7 @@ export function apply(ctx, config) {
 			const matches = store.recall(String(body?.q ?? ''), Number(body?.limit ?? recallLimit));
 			return { matches, digest: renderRecall(matches) };
 		}
+		if (action === 'prune') return store.prune();
 		throw Object.assign(new Error(`unknown action: ${action}`), { code: 'bad-request' });
 	}
 
@@ -650,6 +891,7 @@ export function apply(ctx, config) {
 					for await (const chunk of attachments.readFileStream(ref)) chunks.push(Buffer.from(chunk));
 					await store.store({
 						name: typeof ref.name === 'string' && ref.name !== '' ? ref.name : key.slice(0, 12),
+						mime: typeof ref.mediaType === 'string' ? ref.mediaType : undefined,
 						bytes: Buffer.concat(chunks),
 						source,
 						origin: sessionId,

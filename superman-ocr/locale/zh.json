@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "记忆体 Superman OCR",
+    "description": "给记忆体补上「扫描件也能回忆」：在 macOS 上用 PDFKit 渲染页面、Vision 识别简体中文与英文，首次使用时用 swiftc 现场编译一个自带的小工具，把没有文字层的 PDF（扫描件、文字转曲）变成可检索的正文。"
+  }
+}

@@ -24,6 +24,7 @@ prompt 段 + 会话事件）接入，不修改 DSH 任何源码：
 |---|---|
 | `chat-mode` | **Chat 模式**：仿 ChatGPT 的纯对话面板。带对话记录、上传文件、DeepSeek 模型与思考强度选择；输出按 Markdown + **LaTeX→MathML** 排版；不调用任何工具 |
 | `superman` | **记忆体 Superman**：侧边栏大脑图标入口的智能文件夹。Harness 与 Chat 上传的文件/图片自动识别归类到 **PDF / 图片 / 程序 / 其他**，对话与任务记录同步进同一核心，两个模式思考时都会自动回忆；每记住一份文件弹出提示卡 |
+| `superman-ocr` | **本机 OCR**：给没有文本层的扫描件（macOS Vision）识别文字，Chat 上传时自动降级调用 |
 | `arxiv-search` | **arXiv 搜索 + 文献捕获**：设置里的论文检索小节，每条结果一个「收藏到记忆体」按钮，自动下载 PDF 归档进 Superman（下载受阻时降级为记录） |
 
 三者可以独立安装，彼此只通过同源的 `/api/superman/api` 契约通信：
@@ -63,6 +64,7 @@ cd dsh-superman-suite
 plugin_manager({ action: 'install_bundle', target: '<repo>/chat-mode' })
 plugin_manager({ action: 'install_bundle', target: '<repo>/superman' })
 plugin_manager({ action: 'install_bundle', target: '<repo>/arxiv-search' })
+plugin_manager({ action: 'install_bundle', target: '<repo>/superman-ocr' })   # 可选：扫描件 OCR
 ```
 
 - 新增 bundle 装入后经加载器 **HMR 立即生效**，无需重启；修改已安装包的 Host 半则需要重启进程。
@@ -97,6 +99,7 @@ node tools/chat-mode-format-check.mjs   # 59 项：LaTeX→MathML、Markdown、�
 node tools/superman-host-check.mjs      # 39 项：分类、存储、回忆、Harness 捕获
 node tools/superman-check.mjs           # 57 项：入口、文件夹、预览、上传、提示卡
 node tools/arxiv-smoke.mjs              # 52 项：arXiv 半，含收藏三条路径
+node tools/superman-ocr-check.mjs       # 66 项：OCR 路由、编译、超时、清理
 node tools/paper-metrics.mjs            # 重跑论文所用的全部度量
 ```
 
@@ -114,12 +117,12 @@ node tools/paper-metrics.mjs            # 重跑论文所用的全部度量
 
 ### 设计的取舍（诚实说明）
 
-- PDF 抽取只读文本层：扫描件/文字转曲会得到「无文字层」的明确提示，不做 OCR。
-- 回忆是词法匹配（词频 + 近义字符/二元组 + 近因），不是向量检索。
-- Chat 对话记录存在页面 origin 的 `localStorage`：重启仍在，但清除站点数据或换端口（如
-  `dsh web` 的 3080）不会共享。
-- 历史里的图片只留 160px 缩略图；重发旧轮次时会明确标注「原图不可用」。
-- 视觉细节没有自动化端到端（DOM）测试，靠离线套件 + 实时槽位/提示词检查覆盖。
+v1 列出的局限已逐条处理，见 [docs/LIMITATIONS.md](docs/LIMITATIONS.md)：扫描件走本机 OCR、
+回忆升级为 BM25、对话记录经记忆体跨 origin 恢复、历史图片取回原图、记忆体有容量策略与对账、
+入库即抽取 PDF 文本。仍存在的两项：
+
+- **语义回忆**仍缺：本机没有嵌入服务，回忆是词法检索（已升级为 BM25）；接入点只有 `recall(q)` 一个函数。
+- **浏览器级 DOM 套件**（`tools/dom-check.mjs`）仍在收敛 jsdom 与 React 的环境差异，暂未纳入发布。
 
 ---
 
@@ -136,6 +139,7 @@ without modifying a single line of DSH:
 |---|---|
 | `chat-mode` | **Chat mode**: a ChatGPT-style plain-conversation panel with saved history, file attachments, DeepSeek model and thinking-effort selection, and Markdown + **LaTeX→MathML** typesetting. No tools. |
 | `superman` | **Superman memory**: a smart folder behind a brain icon in the sidebar. Files and images uploaded in either mode are classified into **PDF / images / code / other**; conversation and task records join the same core; both modes recall it while they think; every remembered file raises a notice. |
+| `superman-ocr` | **On-device OCR**: reads scanned PDFs with no text layer (macOS Vision) and is called automatically by Chat uploads |
 | `arxiv-search` | **arXiv search + literature capture**: the Settings search section gains a *save to memory* button per result that downloads the PDF into Superman, degrading to a metadata record when the download is blocked. |
 
 The three install independently and talk only through the same-origin
@@ -181,6 +185,7 @@ Then install each package by absolute path (from the harness itself or its agent
 plugin_manager({ action: 'install_bundle', target: '<repo>/chat-mode' })
 plugin_manager({ action: 'install_bundle', target: '<repo>/superman' })
 plugin_manager({ action: 'install_bundle', target: '<repo>/arxiv-search' })
+plugin_manager({ action: 'install_bundle', target: '<repo>/superman-ocr' })   # optional: OCR for scans
 ```
 
 - A **new** bundle activates through the loader immediately (no restart); editing the
@@ -191,8 +196,9 @@ plugin_manager({ action: 'install_bundle', target: '<repo>/arxiv-search' })
 ### Layout
 
 ```
-chat-mode/          Chat mode bundle (host 255 lines + browser 4017 lines)
-superman/           memory bundle (host 666 + browser 1320)
+chat-mode/          Chat mode bundle (host 255 lines + browser 4000+ lines)
+superman/           memory bundle (host 900+ + browser 1320, plus the pdf.js extractor)
+superman-ocr/       on-device OCR bundle (macOS Vision, for scans)
 arxiv-search/       arXiv bundle (host 139 + browser 784)
 tools/               offline verification (5 suites, 284 checks) and metric scripts
 papers/              two papers (zh/en): Markdown sources, figures, data, PDFs
@@ -207,6 +213,7 @@ node tools/chat-mode-format-check.mjs   # 59: LaTeX→MathML, Markdown, decoding
 node tools/superman-host-check.mjs      # 39: classification, store, recall, capture
 node tools/superman-check.mjs           # 57: entry, folders, preview, upload, notices
 node tools/arxiv-smoke.mjs              # 52: arXiv bundle incl. the bookmark paths
+node tools/superman-ocr-check.mjs       # 66: OCR route, compile, timeout, cleanup
 node tools/paper-metrics.mjs            # re-measure everything the papers report
 ```
 
@@ -224,15 +231,15 @@ and PDF scripts consume.
 
 ### Honest limitations
 
-- PDF extraction reads the text layer only: scanned or outlined documents report
-  "no text layer" instead of being OCR'd.
-- Recall is lexical, not embedding-based.
-- Chat history lives in the page origin's `localStorage`: it survives restarts, but not
-  clearing site data, and is not shared with a different port (`dsh web` on 3080).
-- Images restored from history keep a 160 px thumbnail; resending an old turn marks them
-  unavailable rather than dropping them silently.
-- There is no automated browser-level (DOM) end-to-end test: verification is the offline
-  suites plus live slot and prompt inspection, so visual details remain unverified.
+Every v1 limitation was addressed one by one — see [docs/LIMITATIONS.md](docs/LIMITATIONS.md):
+scans now go through on-device OCR, recall is BM25, conversations survive a cleared origin
+through the memory, history images fetch their original bytes back, the memory has capacity
+policy plus reconciliation, and PDFs are parsed on store. Two items remain:
+
+- **Semantic recall** is still missing: there is no embedding service on this machine, so
+  retrieval stays lexical (now BM25). The seam is the single `recall(q)` function.
+- The **browser-level DOM suite** (`tools/dom-check.mjs`) is still converging jsdom/React
+  environment differences and is not part of the published tree yet.
 
 ### Cite
 

@@ -31,6 +31,18 @@ window.__ModuleLoader__.load({
 		const MEMORY_API = '/api/superman/api';
 		/** Where the composer's "remember" switch is kept. */
 		const MEMORY_SWITCH_KEY = 'dsh.chat-mode.memory';
+		/** The memory's byte route, for fetching back what history only kept a thumbnail of. */
+		const MEMORY_FILE = '/api/superman/file';
+		/** The optional OCR companion bundle, for PDFs whose text layer is empty. */
+		const OCR_API = '/api/superman-ocr/api';
+		/** How long one OCR run may take; a scanned document is slow on purpose. */
+		const OCR_TIMEOUT_MS = 600000;
+		/** The note id prefix under which the memory keeps a restorable conversation. */
+		const MEMORY_CONVERSATION_PREFIX = 'chatstate:';
+		/** How long a memory command may take before it is treated as unavailable. */
+		const MEMORY_TIMEOUT_MS = 8000;
+		/** Characters of a conversation payload the memory's note cap allows. */
+		const MEMORY_PAYLOAD_CHARS = 7900;
 		/** Longest transcript synced to the memory per conversation. */
 		const MAX_NOTE_CHARS = 8000;
 		/** Required services (cordis fiber inject). */
@@ -212,18 +224,96 @@ window.__ModuleLoader__.load({
 		 * @returns the command's value, or undefined when the memory is unavailable.
 		 */
 		async function memoryCommand(body) {
+			const controller = new AbortController();
+			const timer = window.setTimeout(() => controller.abort(), MEMORY_TIMEOUT_MS);
 			try {
 				const response = await fetch(MEMORY_API, {
 					method: 'POST',
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify(body),
+					signal: controller.signal,
 				});
 				const payload = await response.json();
 				if (payload?.ok !== true) return undefined;
 				return payload.value;
 			} catch {
 				return undefined;
+			} finally {
+				window.clearTimeout(timer);
 			}
+		}
+
+		/**
+		 * Recover the original bytes of one image the memory stored, for a history
+		 * entry that only carries a thumbnail.
+		 * @param image - the restored attachment.
+		 * @returns the same attachment, with `data` when the memory still has it.
+		 */
+		async function restoreImage(image) {
+			if (typeof image.data === 'string') return image;
+			if (typeof image.memoryId !== 'string' || image.memoryId === '') return image;
+			try {
+				const response = await fetch(`${MEMORY_FILE}?id=${encodeURIComponent(image.memoryId)}`);
+				if (!response.ok) return image;
+				const bytes = new Uint8Array(await response.arrayBuffer());
+				if (bytes.length === 0) return image;
+				return { ...image, data: base64FromBytes(bytes) };
+			} catch {
+				return image;
+			}
+		}
+
+		/**
+		 * Read a scanned PDF with the optional OCR companion bundle. Silent when that
+		 * bundle is not installed, so Chat keeps working without it.
+		 * @param bytes - the PDF bytes.
+		 * @param name - the file name, for the OCR tool's logs.
+		 * @returns the recognised text and page count, or null.
+		 */
+		async function readByOcr(bytes, name) {
+			const controller = new AbortController();
+			const timer = window.setTimeout(() => controller.abort(), OCR_TIMEOUT_MS);
+			try {
+				const response = await fetch(OCR_API, {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ action: 'ocr', base64: base64FromBytes(bytes), name }),
+					signal: controller.signal,
+				});
+				const payload = await response.json();
+				if (payload?.ok !== true || typeof payload.value?.text !== 'string') return null;
+				const text = payload.value.text.trim();
+				if (text === '') return null;
+				return { text, pages: Number(payload.value.pages ?? 0) };
+			} catch {
+				return null;
+			} finally {
+				window.clearTimeout(timer);
+			}
+		}
+
+		/**
+		 * Fill in what history pruned, before the turn is sent: images come back from
+		 * the memory, so an old conversation can be continued instead of being told
+		 * that its pictures are gone.
+		 * @param history - the conversation, oldest first.
+		 * @returns the conversation with every recoverable image restored.
+		 */
+		async function hydrate(history) {
+			const restored = [];
+			for (const message of history) {
+				const missing = (message.attachments ?? []).filter((item) => item.kind === 'image' && typeof item.data !== 'string');
+				if (message.role !== 'user' || missing.length === 0) {
+					restored.push(message);
+					continue;
+				}
+				const attachments = [];
+				for (const item of message.attachments ?? []) {
+					attachments.push(item.kind === 'image' ? await restoreImage(item) : item);
+				}
+				restored.push({ ...message, attachments });
+			}
+			return restored;
 		}
 
 		/**
@@ -2350,6 +2440,7 @@ window.__ModuleLoader__.load({
 				kind: item.kind,
 				bytes: item.bytes,
 				...(item.detail === undefined ? {} : { detail: item.detail }),
+				...(typeof item.memoryId === 'string' && item.memoryId !== '' ? { memoryId: item.memoryId } : {}),
 			};
 			if (item.kind === 'text') {
 				const text = typeof item.text === 'string' ? item.text : '';
@@ -2462,6 +2553,7 @@ window.__ModuleLoader__.load({
 			memoryOn: '这会话会回忆记忆体（点击关闭）',
 			memoryOff: '这会话不回忆记忆体（点击开启）',
 			memorySaved: '已存入记忆体 {n} 项',
+			memoryRestored: '已从记忆体恢复 {n} 个会话',
 			memoryFailed: '记忆体写入失败（Superman 插件可能未启用）',
 			memoryRecalled: '记忆体命中 {n} 项，已作为上下文',
 			attached: '附件',
@@ -2490,6 +2582,7 @@ window.__ModuleLoader__.load({
 			pdfUnreadable: '这个 PDF 的文字无法解析。',
 			pdfTooLarge: 'PDF 超过 40 MB，已跳过。',
 			pdfSparse: '（这份 PDF 每页能提取到的文字很少，可能是扫描件或文字已转曲；如果内容不完整，请上传页面截图）',
+			pdfOcr: '（这份 PDF 没有文本层，以下内容由本机 OCR 识别，可能有错字）',
 			imageUnavailable: '[图片 "{name}" 是更早一轮上传的，原图已不在本地缓存中，如需再次查看请重新上传]',
 			textTruncated: '[附件 "{name}" 的历史内容在本地只保留了一部分]',
 			chars: '字',
@@ -2532,6 +2625,7 @@ window.__ModuleLoader__.load({
 			memoryOn: 'This chat recalls the memory (click to turn off)',
 			memoryOff: 'This chat does not recall the memory (click to turn on)',
 			memorySaved: '{n} item(s) saved to the memory',
+			memoryRestored: '{n} conversation(s) restored from the memory',
 			memoryFailed: 'The memory could not be saved to (the Superman plugin may be off)',
 			memoryRecalled: 'The memory matched {n} item(s); they were added as context',
 			attached: 'Attachments',
@@ -2560,6 +2654,7 @@ window.__ModuleLoader__.load({
 			pdfUnreadable: 'The text of this PDF could not be parsed.',
 			pdfTooLarge: 'The PDF is larger than 40 MB and was skipped.',
 			pdfSparse: '(This PDF has very little extractable text per page — it may be a scan or have outlined text; upload page images if content is missing.)',
+			pdfOcr: '(This PDF has no text layer; the text below was recognised on this machine by OCR and may contain errors.)',
 			imageUnavailable: '[image "{name}" was uploaded in an earlier turn and is no longer cached locally; upload it again to look at it once more]',
 			textTruncated: '[only part of the earlier content of "{name}" is kept locally]',
 			chars: 'chars',
@@ -2619,6 +2714,8 @@ window.__ModuleLoader__.load({
 			/** Memory upload counters for the composer's status line. */
 			let memoryStored = 0;
 			let memoryFailed = 0;
+			/** How many conversations the memory handed back last time history was read. */
+			let memoryRestored = 0;
 			/** How many memory entries the last question recalled. */
 			let recalledCount = 0;
 
@@ -2698,7 +2795,12 @@ window.__ModuleLoader__.load({
 				saveTimer = window.setTimeout(persist, 600);
 			}
 
-			/** Load the stored list and reopen the conversation that was open. */
+			/**
+			 * Load the stored list and reopen the conversation that was open. The
+			 * origin's `localStorage` is the fast copy; the memory is the durable one,
+			 * so a conversation written on another port or in another browser is merged
+			 * back in and cached locally.
+			 */
 			function restore() {
 				store.update((draft) => {
 					draft.memoryOn = memoryOn;
@@ -2718,6 +2820,46 @@ window.__ModuleLoader__.load({
 					});
 				}
 				publishList();
+				void mergeMemoryHistory();
+			}
+
+			/**
+			 * Add the conversations only the memory knows about — written on another
+			 * port, in another browser, or before this origin's storage was cleared —
+			 * to the list that is already on screen, and cache them locally.
+			 */
+			async function mergeMemoryHistory() {
+				const fromMemory = await readMemoryConversations();
+				if (fromMemory.length === 0) return;
+				const byId = new Map(stored.map((item) => [item.id, item]));
+				let adopted = 0;
+				for (const record of fromMemory) {
+					const local = byId.get(record.id);
+					if (local === undefined || (record.updatedAt ?? 0) > (local.updatedAt ?? 0)) {
+						/* Every conversation the memory contributed counts, whether it filled a
+						   gap on a fresh origin or replaced an older local copy. */
+						adopted += 1;
+						byId.set(record.id, record);
+					}
+				}
+				if (byId.size === stored.length && adopted === 0) return;
+				stored = [...byId.values()].sort((left, right) => (left.updatedAt ?? 0) - (right.updatedAt ?? 0));
+				writeHistory(storage, stored, activeId);
+				if (activeId !== null) {
+					const record = stored.find((item) => item.id === activeId);
+					if (record !== undefined && record.messages.length > store.getSnapshot().messages.length) {
+						store.update((draft) => {
+							draft.messages = record.messages;
+						});
+					}
+				}
+				publishList();
+				if (adopted > 0) {
+					memoryRestored = adopted;
+					store.update((draft) => {
+						draft.memoryStatus = t('memoryRestored').replace('{n}', String(adopted));
+					});
+				}
 			}
 
 			/** Open a fresh, still empty conversation, keeping the previous one. */
@@ -2919,9 +3061,14 @@ window.__ModuleLoader__.load({
 				store.update((draft) => {
 					draft.memoryStatus = memoryFailed > 0 ? t('memoryFailed') : t('memorySaved').replace('{n}', String(memoryStored));
 				});
+				return typeof value?.item?.id === 'string' ? value.item.id : undefined;
 			}
 
-			/** Mirror the open conversation into the memory, so later chats can find it. */
+			/**
+			 * Mirror the open conversation into the memory twice: once as prose, so
+			 * recall can find it, and once as a restorable payload, so the history
+			 * survives a cleared origin, another port or another browser.
+			 */
 			async function rememberConversation() {
 				const state = store.getSnapshot();
 				if (state.activeId === null || state.messages.length === 0) return;
@@ -2931,17 +3078,125 @@ window.__ModuleLoader__.load({
 					if (body !== '') parts.push(`${message.role === 'user' ? t('you') : 'DeepSeek'}：${body}`);
 				}
 				const text = parts.join('\n\n');
+				const title = titleOf(state.messages, t('newChat'));
+				const tags = state.selection === null ? [] : [state.selection.model];
 				await memoryCommand({
 					action: 'note',
 					note: {
 						id: `chat:${state.activeId}`,
 						kind: 'conversation',
-						title: titleOf(state.messages, t('newChat')),
+						title,
 						text: text.length > MAX_NOTE_CHARS ? text.slice(-MAX_NOTE_CHARS) : text,
 						source: 'chat',
-						tags: state.selection === null ? [] : [state.selection.model],
+						tags,
 					},
 				});
+				await memoryCommand({
+					action: 'note',
+					note: {
+						id: `${MEMORY_CONVERSATION_PREFIX}${state.activeId}`,
+						kind: 'conversation',
+						title,
+						text: restorablePayload(state, title),
+						source: 'chat',
+						tags,
+					},
+				});
+			}
+
+			/**
+			 * Serialise a conversation small enough for one memory note, dropping the
+			 * oldest turns until it fits. Attachments keep their names and sizes, the
+			 * text of a file keeps a readable excerpt, and an image keeps the memory id
+			 * that can bring its bytes back.
+			 * @param state - the live snapshot.
+			 * @param title - the conversation title.
+			 * @returns the JSON payload.
+			 */
+			function restorablePayload(state, title) {
+				const payload = {
+					v: 1,
+					title,
+					updatedAt: Date.now(),
+					selection: state.selection ?? null,
+					messages: state.messages
+						.filter((message) => message.status !== 'streaming')
+						.filter((message) => (typeof message.text === 'string' && message.text.trim() !== '') || (message.attachments ?? []).length > 0)
+						.map((message) => ({
+							role: message.role,
+							text: typeof message.text === 'string' ? message.text : '',
+							attachments: (message.attachments ?? []).map((item) => ({
+								name: item.name,
+								kind: item.kind,
+								bytes: item.bytes,
+								mediaType: item.mediaType ?? null,
+								thumb: item.thumb ?? null,
+								detail: item.detail ?? null,
+								memoryId: item.memoryId ?? null,
+								...(item.kind === 'text' ? { text: (item.text ?? '').slice(0, 2000) } : {}),
+							})),
+						})),
+				};
+				let json = JSON.stringify(payload);
+				while (json.length > MEMORY_PAYLOAD_CHARS && payload.messages.length > 1) {
+					payload.messages.shift();
+					json = JSON.stringify(payload);
+				}
+				if (json.length > MEMORY_PAYLOAD_CHARS) {
+					for (const message of payload.messages) message.text = message.text.slice(0, 600);
+					json = JSON.stringify(payload);
+				}
+				return json;
+			}
+
+			/**
+			 * Read the conversations the memory kept, so history outlives the origin's
+			 * `localStorage`.
+			 * @returns the restorable conversations, oldest first.
+			 */
+			async function readMemoryConversations() {
+				const value = await memoryCommand({ action: 'list' });
+				const notes = Array.isArray(value?.notes) ? value.notes : [];
+				const out = [];
+				for (const note of notes) {
+					if (typeof note?.id !== 'string' || !note.id.startsWith(MEMORY_CONVERSATION_PREFIX)) continue;
+					if (typeof note.text !== 'string') continue;
+					let payload;
+					try {
+						payload = JSON.parse(note.text);
+					} catch {
+						continue;
+					}
+					if (payload?.v !== 1 || !Array.isArray(payload.messages)) continue;
+					out.push({
+						id: note.id.slice(MEMORY_CONVERSATION_PREFIX.length),
+						title: typeof payload.title === 'string' ? payload.title : note.title,
+						updatedAt: Number(payload.updatedAt ?? note.updatedAt ?? Date.now()),
+						selection: payload.selection ?? null,
+						messages: payload.messages.map(restoredMessage),
+					});
+				}
+				return out;
+			}
+
+			/** One message parsed back out of a memory payload. */
+			function restoredMessage(input) {
+				return {
+					id: uid('m'),
+					role: input?.role === 'assistant' ? 'assistant' : 'user',
+					text: typeof input?.text === 'string' ? input.text : '',
+					attachments: (Array.isArray(input?.attachments) ? input.attachments : []).map((item) => ({
+						id: uid('a'),
+						name: String(item?.name ?? ''),
+						kind: item?.kind === 'image' ? 'image' : 'text',
+						bytes: Number(item?.bytes ?? 0),
+						...(typeof item?.mediaType === 'string' ? { mediaType: item.mediaType } : {}),
+						...(typeof item?.thumb === 'string' ? { thumb: item.thumb } : {}),
+						...(typeof item?.detail === 'string' ? { detail: item.detail } : {}),
+						...(typeof item?.memoryId === 'string' && item.memoryId !== '' ? { memoryId: item.memoryId } : {}),
+						...(typeof item?.text === 'string' ? { text: item.text } : {}),
+					})),
+				};
 			}
 
 			/**
@@ -3001,7 +3256,7 @@ window.__ModuleLoader__.load({
 							skipped.push(`${file.name}: ${t('imageTooLarge')}`);
 							continue;
 						}
-						next.push({
+						const attachment = {
 							id: uid('img'),
 							name: file.name,
 							kind: 'image',
@@ -3010,8 +3265,10 @@ window.__ModuleLoader__.load({
 							data: base64FromBytes(bytes),
 							thumb: await makeThumbnail(file),
 							detail: formatBytes(file.size),
-						});
-						void remember({ name: file.name, mime: mediaType, bytes });
+						};
+						next.push(attachment);
+						const storedId = await remember({ name: file.name, mime: mediaType, bytes });
+						if (storedId !== undefined) attachment.memoryId = storedId;
 						continue;
 					}
 					if (kind === 'pdf') {
@@ -3019,19 +3276,26 @@ window.__ModuleLoader__.load({
 							skipped.push(`${file.name}: ${t('pdfTooLarge')}`);
 							continue;
 						}
-						const extracted = await extractPdfText(bytes);
+						let extracted = await extractPdfText(bytes);
+						let recognised = false;
 						if (extracted.text.trim() === '') {
-							skipped.push(`${file.name}: ${pdfReason(extracted.note)}`);
-							continue;
+							const seen = await readByOcr(bytes, file.name);
+							if (seen === null) {
+								skipped.push(`${file.name}: ${pdfReason(extracted.note)}`);
+								continue;
+							}
+							extracted = { text: seen.text, pages: seen.pages, note: 'ocr' };
+							recognised = true;
 						}
 						const clipped = extracted.text.length > MAX_TEXT_CHARS;
-						const sparse = extracted.pages >= 3 && extracted.text.length / extracted.pages < 60;
+						const sparse = !recognised && extracted.pages >= 3 && extracted.text.length / extracted.pages < 60;
+						const marker = recognised ? `${t('pdfOcr')}\n\n` : sparse ? `${t('pdfSparse')}\n\n` : '';
 						next.push({
 							id: uid('pdf'),
 							name: file.name,
 							kind: 'text',
 							bytes: file.size,
-							text: `${sparse ? `${t('pdfSparse')}\n\n` : ''}${clipped ? extracted.text.slice(0, MAX_TEXT_CHARS) : extracted.text}`,
+							text: `${marker}${clipped ? extracted.text.slice(0, MAX_TEXT_CHARS) : extracted.text}`,
 							detail: detailOf({ bytes: file.size, pages: extracted.pages, pageWord: t('pdfPages') }),
 						});
 						if (clipped) skipped.push(`${t('clipped')}${file.name}`);
@@ -3126,7 +3390,7 @@ window.__ModuleLoader__.load({
 					const response = await fetch(STREAM_URL, {
 						method: 'POST',
 						headers: { 'content-type': 'application/json' },
-						body: JSON.stringify({ ...state.selection, messages: wireMessages(history, t, digest) }),
+						body: JSON.stringify({ ...state.selection, messages: wireMessages(await hydrate(history), t, digest) }),
 						signal: abort.signal,
 					});
 					if (!response.ok) {

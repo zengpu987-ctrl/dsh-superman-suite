@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Superman OCR",
+    "description": "Makes scanned files recallable: pages are rendered with PDFKit and read with the Vision framework (Simplified Chinese + English), through a small self-contained Swift tool that is compiled with swiftc on first use, so PDFs without a text layer become searchable text."
+  }
+}

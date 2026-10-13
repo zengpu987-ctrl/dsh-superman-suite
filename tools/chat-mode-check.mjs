@@ -423,6 +423,384 @@ check(tool.readHistory({ getItem: () => 'not json' }).conversations.length === 0
 
 //#endregion
 
+//#region memory durability: images, chatstate notes, OCR
+/* A stateful in-process stand-in for the Superman memory. It answers the same
+   command bodies the shipped client posts, keeps the notes and items it was
+   given, and serves stored bytes back through the file route, so a picture
+   pruned out of `localStorage` can genuinely come back. */
+const CHATSTATE_PREFIX = 'chatstate:';
+const memoryEngine = {
+	notes: new Map(),
+	storeItems: [],
+	itemCount: 0,
+	/** Set to true when `list` must pretend the memory knows nothing. */
+	silentList: false,
+	/** 'bytes' serves stored content, 'missing' answers 404, 'throw' rejects. */
+	fileBehaviour: 'bytes',
+	/** 'ok' recognises text, anything else fails like an absent companion. */
+	ocrBehaviour: 'ok',
+	ocrCalls: [],
+	fileRequests: [],
+};
+const notesOf = (id) => [...memoryEngine.notes.values()].filter((note) => note.id === id);
+/** Let the pending promise chain of one client action settle. */
+async function tick(rounds = 6) {
+	for (let index = 0; index < rounds; index += 1) await Promise.resolve();
+}
+/** Build one `chatstate:` note exactly as `rememberConversation` writes it. */
+function chatStateNote(id, { title, updatedAt, messages, selection = null }) {
+	return { id: `${CHATSTATE_PREFIX}${id}`, kind: 'conversation', title, updatedAt, source: 'chat', tags: [], text: JSON.stringify({ v: 1, title, updatedAt, selection, messages }) };
+}
+/** The two conversation records a merge test starts from. */
+const mergeFixture = (ids) => ({
+	older: { id: ids.note, title: 'from the memory', updatedAt: 100, messages: [{ role: 'user', text: 'memory copy' }] },
+	newer: { id: ids.note, title: 'from the memory, newer', updatedAt: 900, messages: [{ role: 'user', text: 'memory copy newer' }, { role: 'assistant', text: 'memory answer' }] },
+	local: (record, updatedAt, text) => ({ id: record.id, title: 'local copy', updatedAt, selection: null, messages: [{ id: `m-${record.id}`, role: 'user', text }] }),
+});
+
+/** The fetch the rest of the suite was using, restored after the timeout probe. */
+const memoryFetch = async (url, init) => {
+	const target = String(url);
+	const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
+	if (target.includes('/api/superman/api')) {
+		memoryCalls.push(body);
+		switch (body.action) {
+			case 'store': {
+				memoryEngine.itemCount += 1;
+				const item = { id: `mem-item-${memoryEngine.itemCount}`, name: body.name, mime: body.mime, category: 'other' };
+				memoryEngine.storeItems.push({ ...item, base64: body.base64, text: body.text });
+				return Response.json({ ok: true, value: { item } });
+			}
+			case 'note': {
+				memoryEngine.notes.set(`${body.note.id}:${memoryEngine.notes.size}`, body.note);
+				return Response.json({ ok: true, value: { note: body.note } });
+			}
+			case 'recall':
+				return Response.json({ ok: true, value: { digest: '', matches: [] } });
+			default:
+				return Response.json({ ok: true, value: { items: [], notes: memoryEngine.silentList ? [] : [...memoryEngine.notes.values()], stats: {}, root: '/tmp/superman' } });
+		}
+	}
+	if (target.includes('/api/superman/file')) {
+		memoryEngine.fileRequests.push(target);
+		if (memoryEngine.fileBehaviour === 'throw') throw new Error('memory file route is down');
+		if (memoryEngine.fileBehaviour === 'missing') return new Response('not found', { status: 404 });
+		const wanted = new URL(target, 'http://127.0.0.1:19387').searchParams.get('id');
+		const item = [...memoryEngine.storeItems].reverse().find((row) => row.id === wanted) ?? null;
+		if (item === null || typeof item.base64 !== 'string') return new Response('not found', { status: 404 });
+		return new Response(Uint8Array.from(Buffer.from(item.base64, 'base64')));
+	}
+	if (target.includes('/api/superman-ocr/api')) {
+		memoryEngine.ocrCalls.push(body);
+		if (memoryEngine.ocrBehaviour !== 'ok') return new Response('no ocr companion', { status: 404 });
+		return Response.json({ ok: true, value: { text: 'Recognised scanned text', pages: 2 } });
+	}
+	const absolute = target.startsWith('http') ? target : `http://127.0.0.1:19387${target}`;
+	return route.fetch(new Request(absolute, init));
+};
+globalThis.fetch = memoryFetch;
+
+/* Image bytes the memory hands back: the upload itself is the source of truth,
+   so the round trip proves the restoration rather than a fixture. */
+const pngBytes = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const pngBase64 = Buffer.from(pngBytes).toString('base64');
+/** The text parts of a recorded outgoing turn, joined. */
+function sentText(call) {
+	return call.messages.flatMap((message) => message.content ?? []).filter((part) => part.type === 'text').map((part) => part.text).join('\n');
+}
+const chatStateIds = { note: 'c-memory-1', local: 'c-memory-2' };
+
+memoryEngine.silentList = true;
+const pictureStorage = createMemoryStorage();
+const pictureFirst = boot(pictureStorage.storage);
+await tick();
+await pictureFirst.props.loadCatalog();
+const pictureFile = new File([pngBytes], 'shot.png', { type: 'image/png' });
+await pictureFirst.props.addFiles([pictureFile]);
+const pictureId = pictureFirst.store.getSnapshot().attachments[0]?.memoryId ?? '';
+check(typeof pictureId === 'string' && pictureId !== '', 'a stored image attachment records the memory item id', String(pictureId));
+check(pictureFirst.store.getSnapshot().attachments[0]?.data === pngBase64, 'the live attachment still carries its bytes');
+pictureFirst.props.setDraft('Look at the picture.');
+await pictureFirst.props.send();
+const savedPicture = tool.readHistory(pictureStorage.storage).conversations.at(-1)?.messages[0]?.attachments[0];
+check(savedPicture?.memoryId === pictureId, 'the memory id survives the save half of the round trip', String(savedPicture?.memoryId));
+check(savedPicture?.data === undefined && savedPicture?.pruned === true, 'the stored copy keeps only the memory id and its thumbnail flag');
+
+memoryEngine.silentList = true;
+const pictureAgain = boot(pictureStorage.storage);
+await tick();
+await pictureAgain.props.loadCatalog();
+const reloadedPicture = pictureAgain.store.getSnapshot().messages[0]?.attachments[0];
+check(reloadedPicture?.memoryId === pictureId, 'the memory id survives the load half of the round trip', String(reloadedPicture?.memoryId));
+check(reloadedPicture?.data === undefined, 'the reloaded image has no bytes of its own');
+pictureAgain.props.setDraft('What was in that picture?');
+await pictureAgain.props.send();
+check(memoryEngine.fileRequests.some((request) => request.includes(`/api/superman/file?id=${encodeURIComponent(pictureId)}`)), 'sending asks the memory for the pruned image by id', memoryEngine.fileRequests.join(' '));
+/* The Host half turns a wire image into a durable attachment block, so the
+   block existing at all proves the client sent base64 bytes rather than an
+   "unavailable" note, and the byte count pins it to the original picture. */
+const sentImage = recordedCall.messages[0].content.find((part) => part.type === 'image');
+check(sentImage?.attachment?.bytes === pngBytes.length, 'the outgoing turn carries the original image bytes', JSON.stringify(sentImage ?? null));
+check(sentImage?.attachment?.mediaType === 'image/png', 'the recovered image keeps its media type', String(sentImage?.attachment?.mediaType));
+check(!sentText(recordedCall).includes('imageUnavailable'), 'no image-unavailable note is sent when the bytes come back');
+const pictureAnswer = pictureAgain.store.getSnapshot().messages.at(-1);
+check(pictureAnswer.status === 'done' && pictureAnswer.text === 'Hello **world**', 'the restored turn still completes normally');
+
+memoryEngine.fileBehaviour = 'missing';
+const missingAgain = boot(pictureStorage.storage);
+await tick();
+await missingAgain.props.loadCatalog();
+missingAgain.props.setDraft('The picture route is gone.');
+await missingAgain.props.send();
+const missingImages = recordedCall.messages[0].content.filter((part) => part.type === 'image');
+check(missingImages.length === 0, 'a 404 from the file route leaves no image part', String(missingImages.length));
+check(sentText(recordedCall).includes('imageUnavailable'), 'a 404 emits the image-unavailable note');
+check(missingAgain.store.getSnapshot().messages.at(-1)?.status === 'done', 'the turn is still sent when the image cannot be recovered');
+
+memoryEngine.fileBehaviour = 'throw';
+const throwingAgain = boot(pictureStorage.storage);
+await tick();
+await throwingAgain.props.loadCatalog();
+throwingAgain.props.setDraft('The picture route throws.');
+await throwingAgain.props.send();
+check(sentText(recordedCall).includes('imageUnavailable'), 'a throwing file route falls back to the same note');
+check(throwingAgain.store.getSnapshot().messages.at(-1)?.status === 'done', 'a throwing file route does not stop the turn');
+memoryEngine.fileBehaviour = 'bytes';
+
+memoryEngine.silentList = true;
+const noteStorage = createMemoryStorage();
+const noteClient = boot(noteStorage.storage);
+await tick();
+await noteClient.props.loadCatalog();
+noteClient.props.setDraft('Keep this conversation.');
+await noteClient.props.send();
+await tick(); /* the note mirror runs on the send path, just after the answer */
+const noteId = noteClient.store.getSnapshot().activeId;
+const proseNotes = notesOf(`chat:${noteId}`);
+const stateNotes = notesOf(`${CHATSTATE_PREFIX}${noteId}`);
+check(proseNotes.length === 1 && typeof proseNotes[0].text === 'string' && proseNotes[0].text.includes('Keep this conversation.'), 'rememberConversation posts the prose note for recall');
+check(stateNotes.length === 1, 'rememberConversation posts a chatstate payload beside it', String(stateNotes.length));
+const statePayload = stateNotes[0] === undefined ? null : JSON.parse(stateNotes[0].text);
+check(statePayload?.v === 1, 'the chatstate payload declares version 1', String(statePayload?.v));
+check(statePayload?.title === 'Keep this conversation.', 'the chatstate payload carries the conversation title', statePayload?.title);
+const snapMessages = noteClient.store.getSnapshot().messages;
+check(statePayload?.messages.length === snapMessages.length, 'the payload has one entry per message', `${statePayload?.messages.length}/${snapMessages.length}`);
+check(statePayload?.messages.some((message) => message.role === 'assistant' && message.text === 'Hello **world**'), 'the payload keeps the assistant answer under its own role');
+check(statePayload?.selection?.model === 'deepseek-flash', 'the payload keeps the model selection');
+
+/* Enough prose that the payload would be far past the memory's note cap. */
+const longMessages = [];
+for (let index = 0; index < 40; index += 1) {
+	longMessages.push({ id: `long-${index}`, role: 'user', text: `Question ${index}: ${'q'.repeat(400)}` });
+	longMessages.push({ id: `long-${index}-a`, role: 'assistant', text: `Answer ${index}: ${'a'.repeat(400)}` });
+}
+const longStorage = createMemoryStorage();
+const longSeed = tool.writeHistory(longStorage.storage, [{ id: 'c-long', title: 'A very long conversation', updatedAt: 10, selection: null, messages: longMessages }], 'c-long');
+check(longSeed.ok === true, 'the long conversation seeds the local cache', `${longSeed.ok}/${longSeed.conversations[0]?.messages.length}`);
+memoryEngine.silentList = true;
+const longClient = boot(longStorage.storage);
+await tick();
+await longClient.props.loadCatalog();
+longClient.props.setDraft('One more turn on a long thread.');
+await longClient.props.send();
+await tick();
+const longId = longClient.store.getSnapshot().activeId;
+console.log('DBG longStatus', JSON.stringify(longClient.store.getSnapshot().messages.map((m) => [m.role, m.status ?? '-', m.text.length])));
+console.log('DBG longNotes', JSON.stringify([...memoryEngine.notes.values()].filter((n) => n.id.startsWith('chatstate:')).map((n) => [n.id, n.text.length])));
+const longNote = notesOf(`${CHATSTATE_PREFIX}${longId}`)[0];
+const longText = longNote?.text ?? '';
+check(longText.length > 0 && longText.length <= 7900, 'a long conversation still fits the memory note cap', String(longText.length));
+let longPayload = null;
+try {
+	longPayload = JSON.parse(longText);
+} catch {
+	longPayload = null;
+}
+check(longPayload !== null && longText === JSON.stringify(longPayload), 'the capped payload is whole JSON, never truncated mid-object');
+check(longPayload?.messages.length < longClient.store.getSnapshot().messages.length, 'capping drops the oldest turns', `${longPayload?.messages.length} of ${longClient.store.getSnapshot().messages.length}`);
+/* The payload is built at the end of `send`, while the answer is still the
+   streaming placeholder: the user's newest question is kept, and the empty
+   assistant row that was streaming is left out of the JSON entirely. */
+check(longPayload?.messages.at(-1)?.role === 'user' && longPayload.messages.at(-1).text.includes('One more turn on a long thread.'), 'the newest question is the last entry in the capped payload', JSON.stringify(longPayload?.messages.at(-1) ?? null).slice(0, 90));
+check(longPayload?.messages.every((message) => message.text !== '' && (message.role === 'user' || message.role === 'assistant')) === true, 'every entry in the payload is a real turn');
+check(longPayload?.messages.some((message) => message.text.includes('Question 0')) === false, 'the oldest turns are the ones dropped');
+
+memoryEngine.silentList = false;
+memoryEngine.notes.clear();
+memoryEngine.notes.set(`${CHATSTATE_PREFIX}${chatStateIds.note}:0`, chatStateNote(chatStateIds.note, {
+	title: 'Written on another port',
+	updatedAt: 5000,
+	selection: { provider: 'deepseek-account', model: 'deepseek-flash', reasoningEffort: 'high' },
+	messages: [
+		{ role: 'user', text: 'A question from the other browser.', attachments: [] },
+		{ role: 'assistant', text: 'An answer the local origin never saw.', attachments: [] },
+	],
+}));
+const freshOrigin = createMemoryStorage();
+const freshClient = boot(freshOrigin.storage);
+await tick();
+const freshState = freshClient.store.getSnapshot();
+check(freshState.conversations.length === 1, 'a fresh origin restores the memory conversation into the list', `${freshState.conversations.length}`);
+check(freshState.conversations[0]?.id === chatStateIds.note, 'the restored list entry keeps the memory conversation id', String(freshState.conversations[0]?.id));
+check(freshOrigin.map.get('dsh.chat-mode.history.v1')?.includes('Written on another port') === true, 'the restored conversation is cached in localStorage');
+const restoredStatus = freshState.memoryStatus ?? '';
+check(restoredStatus.includes('memoryRestored'), 'memoryStatus reports the restoration through the memoryRestored key', restoredStatus);
+const restoredThread = tool.readHistory(freshOrigin.storage).conversations[0]?.messages ?? [];
+check(restoredThread.length === 2 && restoredThread[1]?.text === 'An answer the local origin never saw.', 'the restored messages keep their roles and text', JSON.stringify(restoredThread).slice(0, 80));
+const restoredSelection = tool.readHistory(freshOrigin.storage).conversations[0]?.selection;
+check(restoredSelection?.model === 'deepseek-flash', 'the restored conversation keeps its model selection', JSON.stringify(restoredSelection));
+
+/* The panel's translator is the identity in this harness, so the status is
+   `memoryRestored` with its placeholder filled; the dictionaries themselves are
+   checked for the sentence that key stands for. */
+const memoryRestoredKey = internal.zh.memoryRestored;
+check(typeof memoryRestoredKey === 'string' && typeof internal.en.memoryRestored === 'string', 'the memoryRestored key exists in both dictionaries');
+check(memoryRestoredKey.includes('{n}') && internal.en.memoryRestored.includes('{n}'), 'the memoryRestored sentence takes the restoration count', `${memoryRestoredKey} / ${internal.en.memoryRestored}`);
+check(restoredStatus.startsWith('memoryRestored'), 'the status is built from the memoryRestored sentence', restoredStatus);
+
+memoryEngine.notes.clear();
+memoryEngine.notes.set(`${CHATSTATE_PREFIX}${chatStateIds.note}:0`, chatStateNote(chatStateIds.note, {
+	title: 'from the memory, newer',
+	updatedAt: 900,
+	messages: [{ role: 'user', text: 'memory copy newer' }, { role: 'assistant', text: 'memory answer' }],
+}));
+const olderLocal = mergeFixture(chatStateIds).local(chatStateIds, 100, 'this local copy is the older one');
+const newerLocal = mergeFixture(chatStateIds).local({ id: chatStateIds.local }, 5000, 'this local copy is the newer one');
+const mergeStorage = createMemoryStorage();
+tool.writeHistory(mergeStorage.storage, [olderLocal, newerLocal], chatStateIds.local);
+const mergeClient = boot(mergeStorage.storage);
+await tick();
+const mergeRecord = tool.readHistory(mergeStorage.storage).conversations.find((record) => record.id === chatStateIds.note);
+check(mergeRecord?.updatedAt === 900 && mergeRecord?.messages[1]?.text === 'memory answer', 'an older local copy is upgraded from the memory', JSON.stringify(mergeRecord?.messages));
+const keptRecord = tool.readHistory(mergeStorage.storage).conversations.find((record) => record.id === chatStateIds.local);
+check(keptRecord?.title === 'local copy' && keptRecord?.updatedAt === 5000, 'a newer local copy is not overwritten by the memory', JSON.stringify(keptRecord?.messages));
+check(mergeClient.store.getSnapshot().conversations.length === 2, 'the merged list still holds both conversations', String(mergeClient.store.getSnapshot().conversations.length));
+
+memoryEngine.notes.clear();
+memoryEngine.notes.set(`${CHATSTATE_PREFIX}broken:0`, { id: `${CHATSTATE_PREFIX}broken`, text: '{"v":1,"title":"cut off","messages":' });
+memoryEngine.notes.set(`${CHATSTATE_PREFIX}wrong:0`, { id: `${CHATSTATE_PREFIX}wrong`, text: JSON.stringify({ v: 9, title: 'wrong version', messages: [] }) });
+const brokenStorage = createMemoryStorage();
+const brokenClient = boot(brokenStorage.storage);
+let brokenThrew = null;
+try {
+	await tick();
+} catch (error) {
+	brokenThrew = error;
+}
+check(brokenThrew === null, 'a malformed chatstate payload does not throw', String(brokenThrew));
+check(brokenClient.store.getSnapshot().conversations.length === 0, 'the list still renders when the memory hands back a broken payload', String(brokenClient.store.getSnapshot().conversations.length));
+check(brokenStorage.map.get('dsh.chat-mode.history.v1') === undefined || tool.readHistory(brokenStorage.storage).conversations.length === 0, 'nothing broken is cached locally');
+
+/* A page with no content stream: no text layer, so only OCR can read it. */
+const scannedPdf = buildPdf({
+	objects: {
+		1: '<< /Type /Catalog /Pages 2 0 R >>',
+		2: '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+		3: '<< /Type /Page /Parent 2 0 R /Resources << >> >>',
+	},
+});
+const scanned = await tool.extractPdfText(scannedPdf);
+check(scanned.text.trim() === '', 'the scanned fixture really has no text layer', JSON.stringify(scanned.text));
+
+memoryEngine.silentList = true;
+memoryEngine.ocrBehaviour = 'ok';
+memoryEngine.ocrCalls.length = 0;
+const ocrStorage = createMemoryStorage();
+const ocrClient = boot(ocrStorage.storage);
+await tick();
+await ocrClient.props.loadCatalog();
+const scannedFile = new File([scannedPdf], 'scan.pdf', { type: 'application/pdf' });
+await ocrClient.props.addFiles([scannedFile]);
+const ocrAttachment = ocrClient.store.getSnapshot().attachments[0];
+check(ocrAttachment?.kind === 'text' && ocrAttachment.text.startsWith('pdfOcr'), 'a textless PDF is inlined with the pdfOcr marker', String(ocrAttachment?.text?.slice(0, 60)));
+check(ocrAttachment?.text.includes('Recognised scanned text'), 'the scanned page keeps the recognised text');
+check(memoryEngine.ocrCalls.length === 1, 'the OCR companion is asked exactly once', String(memoryEngine.ocrCalls.length));
+const ocrBody = memoryEngine.ocrCalls[0] ?? {};
+check(ocrBody.action === 'ocr' && ocrBody.base64 === Buffer.from(scannedPdf).toString('base64'), 'the OCR request carries the PDF bytes as base64', String(ocrBody.base64?.slice(0, 24)));
+check(ocrBody.name === 'scan.pdf', 'the OCR request carries the file name', String(ocrBody.name));
+check(memoryCalls.some((call) => call.action === 'store' && call.name === 'scan.pdf' && call.text.includes('Recognised scanned text')), 'the recognised text is what gets stored in the memory');
+check(ocrClient.store.getSnapshot().notice === null, 'a recognised scan reports nothing skipped');
+
+memoryEngine.ocrBehaviour = 'failed';
+memoryEngine.ocrCalls.length = 0;
+const noOcrStorage = createMemoryStorage();
+const noOcrClient = boot(noOcrStorage.storage);
+await tick();
+await noOcrClient.props.loadCatalog();
+let noOcrThrew = null;
+try {
+	await noOcrClient.props.addFiles([new File([scannedPdf], 'scan.pdf', { type: 'application/pdf' })]);
+} catch (error) {
+	noOcrThrew = error;
+}
+check(noOcrThrew === null, 'a failing OCR route does not throw out of the composer', String(noOcrThrew));
+check(noOcrClient.store.getSnapshot().attachments.length === 0, 'a failing OCR route attaches nothing', String(noOcrClient.store.getSnapshot().attachments.length));
+check((noOcrClient.store.getSnapshot().notice ?? '').includes('pdfNoText'), 'a failing OCR route keeps the no-text-layer skip message', String(noOcrClient.store.getSnapshot().notice));
+check(memoryCalls.filter((call) => call.action === 'store' && call.name === 'scan.pdf' && String(call.text ?? '').includes('Recognised')).length === 1, 'a failed scan is not stored as recognised text');
+memoryEngine.ocrBehaviour = 'ok';
+
+/* The 8-second memory timeout, driven deterministically: the check owns
+   `window.setTimeout` while the upload runs, records the delay the client
+   registered, and fires that callback itself, which aborts the request the way
+   a stalled memory would. Nothing waits on the wall clock. The stalled route is
+   the upload's own `store` command, because a text upload never touches the
+   file route. */
+const hangingSignal = { value: null };
+let hangArmed = false;
+const hangClient = boot(createMemoryStorage().storage);
+await tick();
+await hangClient.props.loadCatalog();
+const realSetTimeout = globalThis.window.setTimeout;
+const realClearTimeout = globalThis.window.clearTimeout;
+const restoreTimers = [];
+globalThis.window.setTimeout = (callback, delay) => {
+	restoreTimers.push({ callback, delay });
+	return { unref() {} };
+};
+globalThis.window.clearTimeout = () => {};
+const hangingFetch = async (url, init) => {
+	const target = String(url);
+	const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
+	if (hangArmed && body?.action === 'store') {
+		hangArmed = false;
+		hangingSignal.value = init?.signal ?? null;
+		/* A memory that accepts the upload and then never answers. */
+		return new Promise((resolve, reject) => {
+			init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+		});
+	}
+	return memoryFetch(url, init);
+};
+/* A macrotask boundary, repeated a bounded number of times: the client's own
+   continuation after a `fetch` settles needs real event-loop turns, and this
+   uses `setImmediate` so the patched client timer stays out of the way. */
+const settle = async (rounds = 8) => {
+	for (let index = 0; index < rounds; index += 1) await new Promise((resolve) => setImmediate(resolve));
+};
+hangClient.props.setDraft('Remember this file.');
+globalThis.fetch = hangingFetch;
+hangArmed = true;
+try {
+	/* The upload is deliberately not awaited: its own timer is the only escape. */
+	const stalledUpload = hangClient.props.addFiles([new File(['stalled upload body'], 'stalled.txt', { type: 'text/plain' })]);
+	await settle();
+	void stalledUpload;
+} finally {
+	globalThis.window.setTimeout = realSetTimeout;
+	globalThis.window.clearTimeout = realClearTimeout;
+}
+check(hangingSignal.value !== null, 'the stalled upload is waiting on the memory and never answered');
+check(restoreTimers.some((entry) => entry.delay === 8000), 'the memory command arms an 8-second timer', restoreTimers.map((entry) => entry.delay).join(','));
+check(hangingSignal.value?.aborted === false, 'the stalled request is still live before the timer fires');
+for (const entry of restoreTimers) entry.callback();
+check(hangingSignal.value?.aborted === true, 'the timer aborts the stalled memory request');
+await settle();
+globalThis.fetch = memoryFetch;
+const stalledStatus = hangClient.store.getSnapshot().memoryStatus ?? '';
+check(stalledStatus.includes('memoryFailed'), 'a stalled memory surfaces as a write failure', stalledStatus);
+check(stalledStatus.includes('memorySaved') === false, 'a stalled memory reports nothing saved', stalledStatus);
+//#endregion
+
 //#region failure paths
 hostCtx.llm.stream = async function* stream() {
 	yield { type: 'finish', reason: { kind: 'error', failure: { code: 'provider-down', message: 'provider is down' } } };

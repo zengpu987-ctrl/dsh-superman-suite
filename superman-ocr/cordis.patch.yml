@@ -1,0 +1,18 @@
+# Profile layer of the Superman OCR bundle: one Host row that compiles the
+# Swift text-recognition tool on first use and answers the browser's OCR calls
+# for PDFs whose own text layer is empty.
+#
+# `workDir` holds the compiled binary and the per-call temporary PDFs; it lives
+# in the Harness home so the build survives upgrades and is shared by every
+# workspace. `bin` normally stays empty: setting it points the row at an
+# already-built `ocr-pdf` and skips compiling entirely. `source` normally stays
+# empty too: it then resolves to `tools/ocr-pdf.swift` next to this package.
+- insert:
+    - id: superman-ocr
+      name: '@local/dsh-superman-ocr'
+      config:
+        bin: ''
+        source: ''
+        workDir: !!js dshHomePath('superman-ocr')
+        maxPages: 40
+        timeoutMs: 600000
