@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Superman · DeepSeek Harness 扩展体系与论文 / Extension suite and papers</title>
+<meta name="description" content="Superman: a chat mode, a smart memory and literature capture for DeepSeek Harness — two papers (Chinese and English), measured evidence, and the code.">
+<style>
+  :root {
+    --ink: #14161c; --soft: #4a4f5c; --rule: #dfe2ea; --accent: #2f5bd7;
+    --ok: #1d7a4d; --part: #9a6a00; --open: #9c2f24; --paper: #ffffff; --wash: #f6f7fb;
+    --serif: "STIX Two Text", "STIXGeneral", "Times New Roman", "Songti SC", "SimSun", serif;
+    --sans: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", Arial, sans-serif;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.62 var(--serif); }
+  header.hero { background: var(--wash); border-bottom: 1px solid var(--rule); padding: 56px 24px 40px; }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1, h2, h3, .sans { font-family: var(--sans); }
+  h1 { font-size: 34px; line-height: 1.25; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h1 .sub { display: block; font-size: 19px; color: var(--soft); font-weight: 500; margin-top: 10px; }
+  .authors { font-family: var(--sans); font-size: 15px; color: var(--soft); margin: 14px 0 22px; }
+  .authors b { color: var(--ink); }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn { font-family: var(--sans); font-size: 14px; text-decoration: none; color: var(--ink);
+         border: 1px solid var(--rule); background: #fff; padding: 9px 14px; border-radius: 999px; }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); color: #fff; }
+  .langswitch { float: right; }
+  main { padding: 40px 24px 72px; }
+  h2 { font-size: 22px; margin: 46px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+  h3 { font-size: 17px; margin: 26px 0 6px; }
+  p { margin: 0 0 14px; }
+  .lede { font-size: 17px; color: #23262f; }
+  .abstract { background: var(--wash); border-left: 3px solid var(--accent); padding: 16px 18px; margin: 18px 0 8px; }
+  .abstract h3 { margin-top: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 8px; font-size: 15px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-family: var(--sans); font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--soft); border-bottom: 1.5px solid var(--ink); }
+  .mono { font-family: var(--mono); font-size: 13px; }
+  .badge { font-family: var(--sans); font-size: 12px; padding: 2px 9px; border-radius: 999px; white-space: nowrap; color: #fff; }
+  .badge.ok { background: var(--ok); } .badge.part { background: var(--part); } .badge.open { background: var(--open); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 16px; }
+  figure { margin: 0; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: #fff; }
+  figure img { width: 100%; display: block; }
+  figcaption { font-family: var(--sans); font-size: 12.5px; color: var(--soft); padding: 9px 11px; border-top: 1px solid var(--rule); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 16px; }
+  .card { border: 1px solid var(--rule); border-radius: 8px; padding: 18px; }
+  .card h3 { margin: 0 0 4px; }
+  .card .meta { font-family: var(--sans); font-size: 13px; color: var(--soft); margin-bottom: 12px; }
+  pre { background: #10131a; color: #e8ebf2; padding: 14px 16px; border-radius: 8px; overflow-x: auto; font: 13px/1.55 var(--mono); }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--wash); padding: 1px 5px; border-radius: 4px; }
+  pre code { background: none; padding: 0; }
+  .stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 18px 0 6px; }
+  .stat div { border: 1px solid var(--rule); border-radius: 8px; padding: 14px; }
+  .stat b { display: block; font-family: var(--sans); font-size: 26px; line-height: 1.1; }
+  .stat span { font-family: var(--sans); font-size: 12.5px; color: var(--soft); }
+  footer { border-top: 1px solid var(--rule); padding: 26px 24px 48px; color: var(--soft); font-family: var(--sans); font-size: 13.5px; }
+  body[data-lang="zh"] [data-lang="en"], body[data-lang="en"] [data-lang="zh"] { display: none; }
+  @media (max-width: 620px) { h1 { font-size: 26px; } main { padding: 28px 18px 56px; } }
+</style>
+</head>
+<body data-lang="zh">
+<header class="hero">
+  <div class="wrap">
+    <button class="btn langswitch" id="lang">English</button>
+    <h1>Superman：DeepSeek Harness 扩展体系
+      <span class="sub">A chat mode, a smart memory, and literature capture as harness plugins</span>
+    </h1>
+    <p class="authors">
+      <span data-lang="zh"><b>Anstar, Z.</b> · <b>Zeng, P.</b> · DeepSeek Harness Contributors</span>
+      <span data-lang="en"><b>Anstar, Z.</b> · <b>Zeng, P.</b> · DeepSeek Harness Contributors</span>
+    </p>
+    <div class="links">
+      <a class="btn primary" href="https://github.com/zengpu987-ctrl/dsh-superman-suite/blob/main/papers/v2/paper-zh.pdf"><span data-lang="zh">论文 PDF（中文，19 页）</span><span data-lang="en">Paper PDF (Chinese, 19 pages)</span></a>
+      <a class="btn primary" href="https://github.com/zengpu987-ctrl/dsh-superman-suite/blob/main/papers/v2/paper-en.pdf"><span data-lang="zh">论文 PDF（英文，19 页）</span><span data-lang="en">Paper PDF (English, 19 pages)</span></a>
+      <a class="btn" href="https://github.com/zengpu987-ctrl/dsh-superman-suite"><span data-lang="zh">源代码仓库</span><span data-lang="en">Source repository</span></a>
+      <a class="btn" href="https://github.com/zengpu987-ctrl/dsh-superman-suite/discussions"><span data-lang="zh">社区论坛</span><span data-lang="en">Discussions</span></a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="lede">
+    <span data-lang="zh">这套插件给 DeepSeek Harness 加了三个能力：仿 ChatGPT 的 <b>Chat 模式</b>、会自动归类并在两个模式思考时被回忆的 <b>Superman 记忆体</b>、以及把 arXiv 论文归档进记忆体的 <b>文献捕获</b>。全部以官方插件机制安装，不改 Harness 源码。两篇论文记录了它的构建，以及随后对已记录局限的系统性关闭。</span>
+    <span data-lang="en">Three plugins for DeepSeek Harness: a ChatGPT-style <b>Chat mode</b>, a <b>Superman memory</b> that classifies every upload and is recalled while either mode thinks, and <b>literature capture</b> that archives arXiv papers into that memory — installed through the harness's own plugin mechanism, without forking it. Two papers document the build and the systematic closing of its documented limitations.</span>
+  </p>
+
+  <div class="stat">
+    <div><b>449</b><span data-lang="zh">离线检查（六套）</span><span data-lang="en">offline checks, six suites</span></div>
+    <div><b>199 942</b><span data-lang="zh">真实 PDF 抽取字符</span><span data-lang="en">characters from real PDFs</span></div>
+    <div><b>3 411</b><span data-lang="zh">扫描件 OCR 字符（文本层为 0）</span><span data-lang="en">OCR characters where the layer is 0</span></div>
+    <div><b>46</b><span data-lang="zh">v2 论文参考文献</span><span data-lang="en">references in the v2 paper</span></div>
+  </div>
+
+  <h2><span data-lang="zh">最新论文（v2，19 页）</span><span data-lang="en">The current paper (v2, 19 pages)</span></h2>
+  <h3>Closing the Documented Limitations of an Agent-Harness Memory Extension</h3>
+  <div class="abstract">
+    <h3><span data-lang="zh">摘要</span><span data-lang="en">Abstract</span></h3>
+    <p><span data-lang="zh">智能体编码框架的记忆通常止步于单次会话。我们此前为 DeepSeek Harness 构建的 Superman 扩展套件补上了这一缺口，并如实列出八条局限。本文报告随后的「关闭局限」工作：六条已关闭，一条部分关闭，一条未关闭。扫描件经本机 macOS Vision OCR 恢复为可回忆文本，一页文本层为 0 字符的栅格化页面被识别出 3 411 个字符、其中 979 个汉字。回忆打分改为 BM25（k1 = 1.2、b = 0.75）。每轮对话另写一条上限 7 900 字符的可还原载荷，记忆体在启动时把会话合并回列表。历史图片凭记忆条目 id 取回原始字节。记忆体加入 2 000 条与 512 MiB 双上限、最旧优先淘汰、启动对账与 prune。面板上传与 Harness 捕获的 PDF 在入库时自行抽取文本。离线检查由 284 项增至 449 项，代码由 7 187 行增至 8 869 行。DOM 测试与语义回忆未完成，本文说明其边界。</span><span data-lang="en">Agent harnesses accumulate capability faster than they retire their documented weaknesses, and a limitation recorded in a release note rarely receives the measurement that would show it closed. This paper reports the systematic closure of the eight limitations published with v1 of the Superman suite, an out-of-tree extension for DeepSeek Harness (DSH). Six were closed, one partially, and one not at all. On-device optical character recognition (OCR) through the macOS Vision framework turns image-only pages whose text layer holds zero characters into 3 411 recognised characters, 979 of them Han, and recovers 11 333 characters from a 19-page brochure whose embedded CMap is damaged. Recall was rebuilt as BM25 with k1 = 1.2 and b = 0.75 over name, body and record fields, so a rare query term now outranks a term every document carries. Conversations, images, capacity and store-time extraction moved into the memory: a fresh browser origin restores a conversation from the memory, a resent image is refetched byte-for-byte, PDFs are parsed as they are stored, and item and byte caps evict oldest-first while start-up reconciliation repairs the index. Offline verification grew from 284 to 449 checks across six suites. The browser-level DOM suite remains unconverged and semantic recall remains open because no embedding service exists on this machine; both are reported as such rather than presented as solved.</span></p>
+  </div>
+  <p>
+    <span data-lang="zh">论文主线是<em>关闭已记录的局限</em>本身：六项关闭、一项部分完成、一项如实保留未完成。方法、测量与证据逐条给出，正文之后是附录 A–E 与 46 篇参考文献。</span>
+    <span data-lang="en">The paper's subject is the closing of the limitations themselves: six closed, one partial, one honestly left open — each with its method, measurement and evidence, followed by appendices A–E and 46 references.</span>
+  </p>
+
+  <table>
+    <thead><tr>
+      <th></th>
+      <th><span data-lang="zh">局限</span><span data-lang="en">Limitation</span></th>
+      <th><span data-lang="zh">状态</span><span data-lang="en">Status</span></th>
+      <th><span data-lang="zh">修复与证据</span><span data-lang="en">Fix and evidence</span></th>
+    </tr></thead>
+    <tbody>
+        <tr>
+          <td class="mono">L1</td>
+          <td><span data-lang="zh">扫描件没有文本层</span><span data-lang="en">Scans have no text layer</span></td>
+          <td><span class="badge ok"><span data-lang="zh">已关闭</span><span data-lang="en">closed</span></span></td>
+          <td><span data-lang="zh">本机 OCR（macOS Vision）：栅格化页面文本层 0 字符 → 识别 3 411 字符 / 979 汉字</span><span data-lang="en">On-device OCR (macOS Vision): a rasterised page goes from 0 characters in its text layer to 3 411 characters / 979 Han</span></td>
+        </tr>
+        <tr>
+          <td class="mono">L2</td>
+          <td><span data-lang="zh">平均词法打分偏向长文档</span><span data-lang="en">Flat lexical recall favoured long documents</span></td>
+          <td><span class="badge ok"><span data-lang="zh">已关闭</span><span data-lang="en">closed</span></span></td>
+          <td><span data-lang="zh">BM25（k1 = 1.2，b = 0.75）+ IDF：稀有词文档从第 2 位升到第 1 位</span><span data-lang="en">BM25 (k1 = 1.2, b = 0.75) with IDF: the rare-term document moves from rank 2 to rank 1</span></td>
+        </tr>
+        <tr>
+          <td class="mono">L3</td>
+          <td><span data-lang="zh">记录只存在单一 origin</span><span data-lang="en">History lived in one origin's localStorage</span></td>
+          <td><span class="badge ok"><span data-lang="zh">已关闭</span><span data-lang="en">closed</span></span></td>
+          <td><span data-lang="zh">记忆体保存可还原载荷，换端口 / 清站点数据后仍能恢复</span><span data-lang="en">A restorable payload rides in the memory, so history survives a cleared origin or another port</span></td>
+        </tr>
+        <tr>
+          <td class="mono">L4</td>
+          <td><span data-lang="zh">历史图片只剩缩略图</span><span data-lang="en">History images resent as unavailable</span></td>
+          <td><span class="badge ok"><span data-lang="zh">已关闭</span><span data-lang="en">closed</span></span></td>
+          <td><span data-lang="zh">按记忆体条目 id 取回原图字节</span><span data-lang="en">The memory's item id brings the original bytes back</span></td>
+        </tr>
+        <tr>
+          <td class="mono">L5</td>
+          <td><span data-lang="zh">记忆体只增不减</span><span data-lang="en">The memory only grew</span></td>
+          <td><span class="badge ok"><span data-lang="zh">已关闭</span><span data-lang="en">closed</span></span></td>
+          <td><span data-lang="zh">条数 / 字节上限、最旧优先淘汰、对账与 prune</span><span data-lang="en">maxItems / maxBytes eviction, reconciliation and prune</span></td>
+        </tr>
+        <tr>
+          <td class="mono">L6</td>
+          <td><span data-lang="zh">面板与 Harness 入库不带文本</span><span data-lang="en">Panel and Harness PDFs stored without text</span></td>
+          <td><span class="badge ok"><span data-lang="zh">已关闭</span><span data-lang="en">closed</span></span></td>
+          <td><span data-lang="zh">入库即抽取（与浏览器抽取器逐字节一致）</span><span data-lang="en">Store-time extraction, byte-identical to the browser reader</span></td>
+        </tr>
+        <tr>
+          <td class="mono">L7</td>
+          <td><span data-lang="zh">没有浏览器级 DOM 测试</span><span data-lang="en">No browser-level DOM test</span></td>
+          <td><span class="badge part"><span data-lang="zh">部分完成</span><span data-lang="en">partial</span></span></td>
+          <td><span data-lang="zh">jsdom 挂载与真实事件已可驱动，环境差异仍在收敛</span><span data-lang="en">The jsdom harness mounts and drives the panels; environment differences remain</span></td>
+        </tr>
+        <tr>
+          <td class="mono">L8</td>
+          <td><span data-lang="zh">回忆不是语义检索</span><span data-lang="en">Recall is not semantic</span></td>
+          <td><span class="badge open"><span data-lang="zh">未完成</span><span data-lang="en">open</span></span></td>
+          <td><span data-lang="zh">本机无嵌入服务；接入点只有 recall(q) 一个函数</span><span data-lang="en">No embedding service here; the seam is the single recall(q) function</span></td>
+        </tr>
+    </tbody>
+  </table>
+
+  <h2><span data-lang="zh">图表（v2 论文，全部由实测数据生成）</span><span data-lang="en">Figures (v2, all generated from measured data)</span></h2>
+  <div class="grid">
+      <figure>
+        <img src="papers/v2/figures/en/fig-versions.png" alt="System topology: (a) v1, (b) v2" loading="lazy">
+        <figcaption><b>1</b> <span data-lang="zh">系统拓扑：(a) v1，(b) v2</span><span data-lang="en">System topology: (a) v1, (b) v2</span></figcaption>
+      </figure>
+      <figure>
+        <img src="papers/v2/figures/en/fig-limitations.png" alt="Fix matrix of the eight limitations" loading="lazy">
+        <figcaption><b>2</b> <span data-lang="zh">八项局限的修复矩阵</span><span data-lang="en">Fix matrix of the eight limitations</span></figcaption>
+      </figure>
+      <figure>
+        <img src="papers/v2/figures/en/fig-checks.png" alt="Offline checks per suite, v1 → v2" loading="lazy">
+        <figcaption><b>3</b> <span data-lang="zh">各套件检查项 v1 → v2</span><span data-lang="en">Offline checks per suite, v1 → v2</span></figcaption>
+      </figure>
+      <figure>
+        <img src="papers/v2/figures/en/fig-code.png" alt="Code growth per module" loading="lazy">
+        <figcaption><b>4</b> <span data-lang="zh">各模块代码增长</span><span data-lang="en">Code growth per module</span></figcaption>
+      </figure>
+      <figure>
+        <img src="papers/v2/figures/en/fig-ocr.png" alt="Text layer versus OCR yield" loading="lazy">
+        <figcaption><b>5</b> <span data-lang="zh">文本层与 OCR 产出的对比</span><span data-lang="en">Text layer versus OCR yield</span></figcaption>
+      </figure>
+      <figure>
+        <img src="papers/v2/figures/en/fig-corpus.png" alt="Extraction over the real corpus" loading="lazy">
+        <figcaption><b>6</b> <span data-lang="zh">真实语料上的抽取结果</span><span data-lang="en">Extraction over the real corpus</span></figcaption>
+      </figure>
+      <figure>
+        <img src="papers/v2/figures/en/fig-latency.png" alt="Extraction latency against document length" loading="lazy">
+        <figcaption><b>7</b> <span data-lang="zh">抽取耗时与文档长度</span><span data-lang="en">Extraction latency against document length</span></figcaption>
+      </figure>
+      <figure>
+        <img src="papers/v2/figures/en/fig-bm25.png" alt="Worked BM25 rank flip" loading="lazy">
+        <figcaption><b>8</b> <span data-lang="zh">BM25 排序翻转算例</span><span data-lang="en">Worked BM25 rank flip</span></figcaption>
+      </figure>
+      <figure>
+        <img src="papers/v2/figures/en/fig-lifecycle.png" alt="The memory lifecycle" loading="lazy">
+        <figcaption><b>9</b> <span data-lang="zh">记忆体生命周期</span><span data-lang="en">The memory lifecycle</span></figcaption>
+      </figure>
+  </div>
+
+  <h2><span data-lang="zh">两篇论文</span><span data-lang="en">The two papers</span></h2>
+  <div class="cards">
+    <div class="card">
+      <h3>v2 · <span data-lang="zh">关闭已记录的局限</span><span data-lang="en">Closing the documented limitations</span></h3>
+      <p class="meta"><span data-lang="zh">Anstar, Z. 等 · 19 页 · Nature 风格 · 附录 A–E · 46 篇参考文献</span><span data-lang="en">Anstar, Z. et al. · 19 pages · Nature style · appendices A–E · 46 references</span></p>
+      <p><a href="https://github.com/zengpu987-ctrl/dsh-superman-suite/blob/main/papers/v2/paper-en.pdf">paper-en.pdf</a> · <a href="https://github.com/zengpu987-ctrl/dsh-superman-suite/blob/main/papers/v2/paper-zh.pdf">paper-zh.pdf</a> · <a href="https://github.com/zengpu987-ctrl/dsh-superman-suite/discussions/2"><span data-lang="zh">论坛帖</span><span data-lang="en">discussion post</span></a></p>
+      <p><a href="https://github.com/zengpu987-ctrl/dsh-superman-suite/tree/main/papers/v2"><span data-lang="zh">源稿、图表、度量数据与复现脚本</span><span data-lang="en">sources, figures, measured data and scripts</span></a></p>
+    </div>
+    <div class="card">
+      <h3>v1 · <span data-lang="zh">体系、架构与验证</span><span data-lang="en">the suite, its architecture and verification</span></h3>
+      <p class="meta"><span data-lang="zh">Zeng, P. · 8 页 · A4 双栏 · 284 项检查</span><span data-lang="en">Zeng, P. · 8 pages · A4 two-column · 284 checks</span></p>
+      <p><a href="https://github.com/zengpu987-ctrl/dsh-superman-suite/blob/main/papers/paper-en.pdf">paper-en.pdf</a> · <a href="https://github.com/zengpu987-ctrl/dsh-superman-suite/blob/main/papers/paper-zh.pdf">paper-zh.pdf</a> · <a href="https://github.com/zengpu987-ctrl/dsh-superman-suite/discussions/1"><span data-lang="zh">论坛帖</span><span data-lang="en">discussion post</span></a></p>
+      <p><a href="https://github.com/zengpu987-ctrl/dsh-superman-suite/tree/main/papers"><span data-lang="zh">源稿、图表与数据</span><span data-lang="en">sources, figures and data</span></a></p>
+    </div>
+  </div>
+
+  <h2><span data-lang="zh">仓库结构</span><span data-lang="en">Repository layout</span></h2>
+  <pre><code>v1/          原版 / original release (3 bundles, 284 checks)
+v2/          当前 / current (4 bundles incl. superman-ocr, 449 checks)
+papers/      v1 论文 / the v1 papers
+papers/v2/   v2 论文、图表与度量 / the v2 papers, figures, measurements</code></pre>
+
+  <h2><span data-lang="zh">复现</span><span data-lang="en">Reproduce</span></h2>
+  <pre><code>git clone https://github.com/zengpu987-ctrl/dsh-superman-suite.git &amp;&amp; cd dsh-superman-suite
+node v2/tools/chat-mode-check.mjs        # 139 checks
+node v2/tools/superman-host-check.mjs    # 71 checks
+python papers/v2/tools/metrics.py        # re-measure everything
+python papers/v2/tools/build_pdf.py      # rebuild both PDFs</code></pre>
+  <p>
+    <span data-lang="zh">六套离线检查共 449 项；其中"两端抽取器一致"这一项需要本机存在 PDF 语料，缺语料时会失败而不是静默跳过——论文与附录 E 写明了这个前提。</span>
+    <span data-lang="en">449 checks across six suites; the reader-comparison check needs a PDF corpus present and fails rather than skipping silently when none exists — the paper and Appendix E state that precondition.</span>
+  </p>
+
+  <h2><span data-lang="zh">引用</span><span data-lang="en">Cite</span></h2>
+  <pre><code>@article{superman-v2,
+  author = {Anstar, Z. and Zeng, P. and DeepSeek Harness Contributors},
+  title  = {Closing the Documented Limitations of an Agent-Harness Memory Extension},
+  year   = {2026}
+}</code></pre>
+</main>
+
+<footer class="wrap">
+  <p>
+    <span data-lang="zh">代码以 MIT 许可发布；论文文本与图表可自由引用，请注明出处。语料中的个人文档一律以化名出现，不随仓库分发。</span>
+    <span data-lang="en">Code under the MIT licence; the papers and figures may be cited freely. Personal documents in the corpus appear under aliases only and are not redistributed.</span>
+  </p>
+</footer>
+
+<script>
+  var body = document.body, button = document.getElementById('lang');
+  button.addEventListener('click', function () {
+    var zh = body.getAttribute('data-lang') === 'zh';
+    body.setAttribute('data-lang', zh ? 'en' : 'zh');
+    document.documentElement.lang = zh ? 'en' : 'zh-CN';
+    button.textContent = zh ? '中文' : 'English';
+  });
+</script>
+</body>
+</html>
