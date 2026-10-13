@@ -1,0 +1,11 @@
+# Profile layer of the Superman memory bundle: one Host row that owns the memory
+# directory, classifies what arrives, and answers the browser's queries.
+#
+# `root` is the memory folder. It lives in the Harness home so it survives
+# upgrades and is shared by every workspace.
+- insert:
+    - id: superman
+      name: '@local/dsh-superman'
+      config:
+        root: !!js dshHomePath('superman')
+        recallLimit: 6

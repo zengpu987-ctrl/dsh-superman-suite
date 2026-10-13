@@ -12,6 +12,29 @@
 
 ---
 
+## 版本 / Versions
+
+同一个仓库里放着两个版本，可以直接对照：
+
+| 目录 | 内容 |
+|---|---|
+| [`v1/`](v1/) | **原版**：首次发布时的三个 bundle、五套 284 项检查、以及最初的文档 |
+| [`v2/`](v2/) | **修改版（当前）**：关闭了 v1 记录的八项局限，六套 449 项检查，新增 `superman-ocr` |
+| [`papers/`](papers/) | v1 的两篇论文（8 页） |
+| [`papers/v2/`](papers/v2/) | **v2 的两篇论文**（约 19 页，Nature 风格，含附录与 40+ 参考文献） |
+
+安装时请指向 `v2/<包名>`；要复现 v1 的行为就用 `v1/<包名>`。两份文档各自独立，互不依赖。
+
+| Directory | What it is |
+|---|---|
+| [`v1/`](v1/) | **Original release**: the first three bundles, five suites (284 checks), the original docs |
+| [`v2/`](v2/) | **Current**: every v1 limitation addressed, six suites (449 checks), plus the new `superman-ocr` bundle |
+| [`papers/`](papers/) | the two v1 papers (8 pages each) |
+| [`papers/v2/`](papers/v2/) | **the two v2 papers** (~19 pages, Nature style, appendix, 40+ references) |
+
+Point installs at `v2/<package>`; use `v1/<package>` to reproduce the original behaviour. The
+two trees are independent.
+
 ## 中文
 
 ### 这是什么
@@ -61,15 +84,15 @@ cd dsh-superman-suite
 然后在 Harness 里（或让 Harness 里的 Agent 执行）对每个包调用安装：
 
 ```
-plugin_manager({ action: 'install_bundle', target: '<repo>/chat-mode' })
-plugin_manager({ action: 'install_bundle', target: '<repo>/superman' })
-plugin_manager({ action: 'install_bundle', target: '<repo>/arxiv-search' })
-plugin_manager({ action: 'install_bundle', target: '<repo>/superman-ocr' })   # 可选：扫描件 OCR
+plugin_manager({ action: 'install_bundle', target: '<repo>/v2/chat-mode' })
+plugin_manager({ action: 'install_bundle', target: '<repo>/v2/superman' })
+plugin_manager({ action: 'install_bundle', target: '<repo>/v2/arxiv-search' })
+plugin_manager({ action: 'install_bundle', target: '<repo>/v2/superman-ocr' })   # 可选：扫描件 OCR
 ```
 
 - 新增 bundle 装入后经加载器 **HMR 立即生效**，无需重启；修改已安装包的 Host 半则需要重启进程。
 - Chat/arXiv 与记忆体的联动只需要记忆体包在同一 profile 里；不装 `superman` 也能用。
-- 记忆体默认目录 `~/.dsh/superman`，可在 `superman/cordis.patch.yml` 里改 `config.root`。
+- 记忆体默认目录 `~/.dsh/superman`，可在 `v2/superman/cordis.patch.yml` 里改 `config.root`。
 
 ### 使用
 
@@ -94,13 +117,13 @@ docs/                架构、安装、验证文档（中英双语）
 ### 验证
 
 ```bash
-node tools/chat-mode-check.mjs          # 77 项（无 PDF 语料时 76）：路由、SSE、历史、附件、记忆体联动
-node tools/chat-mode-format-check.mjs   # 59 项：LaTeX→MathML、Markdown、编码识别
-node tools/superman-host-check.mjs      # 39 项：分类、存储、回忆、Harness 捕获
-node tools/superman-check.mjs           # 57 项：入口、文件夹、预览、上传、提示卡
-node tools/arxiv-smoke.mjs              # 52 项：arXiv 半，含收藏三条路径
-node tools/superman-ocr-check.mjs       # 66 项：OCR 路由、编译、超时、清理
-node tools/paper-metrics.mjs            # 重跑论文所用的全部度量
+node v2/tools/chat-mode-check.mjs          # 77 项（无 PDF 语料时 76）：路由、SSE、历史、附件、记忆体联动
+node v2/tools/chat-mode-format-check.mjs   # 59 项：LaTeX→MathML、Markdown、编码识别
+node v2/tools/superman-host-check.mjs      # 39 项：分类、存储、回忆、Harness 捕获
+node v2/tools/superman-check.mjs           # 57 项：入口、文件夹、预览、上传、提示卡
+node v2/tools/arxiv-smoke.mjs              # 52 项：arXiv 半，含收藏三条路径
+node v2/tools/superman-ocr-check.mjs       # 66 项：OCR 路由、编译、超时、清理
+node v2/tools/paper-metrics.mjs            # 重跑论文所用的全部度量
 ```
 
 全部检查都在 Node 里驱动**打包后的真实文件**：浏览器半用桩 `window.__ModuleLoader__`、
@@ -111,9 +134,9 @@ node tools/paper-metrics.mjs            # 重跑论文所用的全部度量
 
 `papers/` 内含同一体系的完整技术论文，中文与英文各一份（约 8 页，A4 双栏）：
 
-- `papers/paper-zh.pdf` / `papers/paper-en.pdf`
-- 源文件：`papers/paper-zh.md` / `papers/paper-en.md`；图表：`papers/figures/{zh,en}/`；
-  测量数据：`papers/data/metrics.json`（可用脚本复现）
+- v1：`papers/paper-zh.pdf` / `papers/paper-en.pdf`（各 8 页）
+- **v2：`papers/v2/paper-zh.pdf` / `papers/v2/paper-en.pdf`**（各约 19 页，Nature 风格，含附录 A–E 与 40+ 参考文献，署名 Anstar 等）
+- 源文件与度量：`papers/v2/paper-{zh,en}.md`、`papers/v2/data/metrics.json`、`papers/v2/tools/`（可复现）
 
 ### 设计的取舍（诚实说明）
 
@@ -182,39 +205,36 @@ git clone <this-repo> dsh-superman-suite
 Then install each package by absolute path (from the harness itself or its agent):
 
 ```
-plugin_manager({ action: 'install_bundle', target: '<repo>/chat-mode' })
-plugin_manager({ action: 'install_bundle', target: '<repo>/superman' })
-plugin_manager({ action: 'install_bundle', target: '<repo>/arxiv-search' })
-plugin_manager({ action: 'install_bundle', target: '<repo>/superman-ocr' })   # optional: OCR for scans
+plugin_manager({ action: 'install_bundle', target: '<repo>/v2/chat-mode' })
+plugin_manager({ action: 'install_bundle', target: '<repo>/v2/superman' })
+plugin_manager({ action: 'install_bundle', target: '<repo>/v2/arxiv-search' })
+plugin_manager({ action: 'install_bundle', target: '<repo>/v2/superman-ocr' })   # optional: OCR for scans
 ```
 
 - A **new** bundle activates through the loader immediately (no restart); editing the
   Host half of an installed package requires a process restart.
 - The memory defaults to `~/.dsh/superman`; change `config.root` in
-  `superman/cordis.patch.yml`.
+  `v2/superman/cordis.patch.yml`.
 
 ### Layout
 
 ```
-chat-mode/          Chat mode bundle (host 255 lines + browser 4000+ lines)
-superman/           memory bundle (host 900+ + browser 1320, plus the pdf.js extractor)
-superman-ocr/       on-device OCR bundle (macOS Vision, for scans)
-arxiv-search/       arXiv bundle (host 139 + browser 784)
-tools/               offline verification (5 suites, 284 checks) and metric scripts
-papers/              two papers (zh/en): Markdown sources, figures, data, PDFs
-docs/                architecture, install, verification (bilingual)
+v1/    original release: chat-mode/ superman/ arxiv-search/ tools/ docs/
+v2/    current: chat-mode/ superman/ superman-ocr/ arxiv-search/ tools/ docs/
+papers/       the two v1 papers (Markdown sources, figures, data, PDFs)
+papers/v2/    the two v2 papers (Nature style, ~19 pages, appendix, 40+ references)
 ```
 
 ### Verify
 
 ```bash
-node tools/chat-mode-check.mjs          # 77 (76 without a PDF corpus): route, SSE, history, attachments, memory wiring
-node tools/chat-mode-format-check.mjs   # 59: LaTeX→MathML, Markdown, decoding
-node tools/superman-host-check.mjs      # 39: classification, store, recall, capture
-node tools/superman-check.mjs           # 57: entry, folders, preview, upload, notices
-node tools/arxiv-smoke.mjs              # 52: arXiv bundle incl. the bookmark paths
-node tools/superman-ocr-check.mjs       # 66: OCR route, compile, timeout, cleanup
-node tools/paper-metrics.mjs            # re-measure everything the papers report
+node v2/tools/chat-mode-check.mjs          # 77 (76 without a PDF corpus): route, SSE, history, attachments, memory wiring
+node v2/tools/chat-mode-format-check.mjs   # 59: LaTeX→MathML, Markdown, decoding
+node v2/tools/superman-host-check.mjs      # 39: classification, store, recall, capture
+node v2/tools/superman-check.mjs           # 57: entry, folders, preview, upload, notices
+node v2/tools/arxiv-smoke.mjs              # 52: arXiv bundle incl. the bookmark paths
+node v2/tools/superman-ocr-check.mjs       # 66: OCR route, compile, timeout, cleanup
+node v2/tools/paper-metrics.mjs            # re-measure everything the papers report
 ```
 
 Every suite drives the **shipped files** in Node: the browser halves load with a stub
@@ -224,10 +244,11 @@ context and a temporary memory directory. See [docs/VERIFICATION.en.md](docs/VER
 
 ### Papers
 
-`papers/` carries a full technical paper about the suite in both languages (~8 pages,
-A4, two columns): `papers/paper-zh.pdf` and `papers/paper-en.pdf`, with their Markdown
-sources, generated figures, and the measured `papers/data/metrics.json` that the chart
-and PDF scripts consume.
+`papers/` carries the v1 paper about the suite in both languages (~8 pages, A4, two
+columns). `papers/v2/` carries the v2 paper — *Closing the Documented Limitations of an
+Agent-Harness Memory Extension* by Anstar et al. (~19 pages, Nature style, Appendix A–E,
+40+ references) — with its Markdown sources, generated figures, the measured
+`papers/v2/data/metrics.json`, and the reproducible scripts that build both PDFs.
 
 ### Honest limitations
 
@@ -244,11 +265,18 @@ policy plus reconciliation, and PDFs are parsed on store. Two items remain:
 ### Cite
 
 ```bibtex
-@misc{superman-suite,
-  author = {Zeng Pu},
-  title  = {Superman: an extension suite for DeepSeek Harness},
+@article{superman-v1,
+  author = {Zeng, P.},
+  title  = {Extending an Agentic Coding Harness with a Conversational Surface, a Smart Memory, and Literature Capture},
   year   = {2026},
-  note   = {Chat mode, smart memory, and literature capture as harness plugins}
+  note   = {v1: the suite, its architecture and its measured verification}
+}
+
+@article{superman-v2,
+  author = {Anstar, Z. and Zeng, P. and DeepSeek Harness Contributors},
+  title  = {Closing the Documented Limitations of an Agent-Harness Memory Extension},
+  year   = {2026},
+  note   = {v2: on-device OCR, BM25 recall, durable history, image fidelity, compaction}
 }
 ```
 

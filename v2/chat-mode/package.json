@@ -1,0 +1,35 @@
+{
+  "name": "@local/dsh-chat-mode",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chat mode for the DeepSeek Harness Web UI: a ChatGPT-style conversation panel beside the agent (Harness) mode, with file attachments, DeepSeek model choice, and thinking effort.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "icon": "./icon.svg",
+  "files": [
+    "index.js",
+    "client.js",
+    "icon.svg",
+    "cordis.patch.yml",
+    "locale/*.json"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Chat 模式",
+    "description": "在 Agent 模式旁边增加一个仿 ChatGPT 的对话框：带对话记录，可上传 PDF、Mathematica 笔记本、图片与文本文件，可选择 DeepSeek 模型与思考强度，不调用工具，直接对话。"
+  }
+}
