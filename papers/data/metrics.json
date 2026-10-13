@@ -1,0 +1,470 @@
+{
+ "generatedAt": "2026-10-13T19:31:19.330Z",
+ "corpus": [
+  {
+   "name": "brochure.pdf",
+   "bytes": 1543450,
+   "medianMs": 38.9,
+   "characters": 9423,
+   "cjk": 9,
+   "noise": 0,
+   "pages": 19,
+   "note": "",
+   "charsPerPage": 496
+  },
+  {
+   "name": "document-B.pdf",
+   "bytes": 181639,
+   "medianMs": 7.9,
+   "characters": 786,
+   "cjk": 394,
+   "noise": 0,
+   "pages": 2,
+   "note": "",
+   "charsPerPage": 393
+  },
+  {
+   "name": "prospectus-2025.pdf",
+   "bytes": 590300,
+   "medianMs": 76.4,
+   "characters": 90938,
+   "cjk": 31791,
+   "noise": 0,
+   "pages": 56,
+   "note": "",
+   "charsPerPage": 1624
+  },
+  {
+   "name": "prospectus-2026.pdf",
+   "bytes": 580415,
+   "medianMs": 75.1,
+   "characters": 89764,
+   "cjk": 31252,
+   "noise": 0,
+   "pages": 54,
+   "note": "",
+   "charsPerPage": 1662
+  },
+  {
+   "name": "contract-2027.pdf",
+   "bytes": 208244,
+   "medianMs": 29,
+   "characters": 36611,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 8,
+   "note": "",
+   "charsPerPage": 4576
+  },
+  {
+   "name": "system-art-1.pdf",
+   "bytes": 7051,
+   "medianMs": 0.3,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-2.pdf",
+   "bytes": 22893,
+   "medianMs": 0.3,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-3.pdf",
+   "bytes": 18285,
+   "medianMs": 0.2,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-4.pdf",
+   "bytes": 21791,
+   "medianMs": 0.6,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-5.pdf",
+   "bytes": 21475,
+   "medianMs": 0.4,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-6.pdf",
+   "bytes": 32530,
+   "medianMs": 0.6,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-7.pdf",
+   "bytes": 31856,
+   "medianMs": 0.4,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-8.pdf",
+   "bytes": 21070,
+   "medianMs": 0.4,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-9.pdf",
+   "bytes": 21623,
+   "medianMs": 0.3,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  }
+ ],
+ "encodings": [
+  {
+   "label": "UTF-8",
+   "expected": "utf-8",
+   "detected": "utf-8",
+   "correct": true,
+   "plausibility": 1.769
+  },
+  {
+   "label": "UTF-8 BOM",
+   "expected": "utf-8",
+   "detected": "utf-8",
+   "correct": true,
+   "plausibility": 1
+  },
+  {
+   "label": "GBK",
+   "expected": "gbk",
+   "detected": "gbk",
+   "correct": true,
+   "plausibility": 2.333
+  },
+  {
+   "label": "Big5",
+   "expected": "big5",
+   "detected": "big5",
+   "correct": true,
+   "plausibility": 3
+  },
+  {
+   "label": "UTF-16LE (no BOM)",
+   "expected": "utf-16le",
+   "detected": "utf-16le",
+   "correct": true,
+   "plausibility": 1.8
+  },
+  {
+   "label": "PNG header",
+   "expected": "binary",
+   "detected": "binary",
+   "correct": true,
+   "plausibility": 0
+  },
+  {
+   "label": "random high bytes",
+   "expected": "binary",
+   "detected": "binary",
+   "correct": true,
+   "plausibility": 0
+  }
+ ],
+ "math": {
+  "battery": [
+   {
+    "expression": "E = mc^2",
+    "markupLength": 161,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 1
+   },
+   {
+    "expression": "\\frac{\\partial f}{\\partial x}",
+    "markupLength": 153,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 1,
+    "scripts": 0
+   },
+   {
+    "expression": "\\vec{F} = m\\vec{a}",
+    "markupLength": 229,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}",
+    "markupLength": 368,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 2,
+    "scripts": 3
+   },
+   {
+    "expression": "\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}",
+    "markupLength": 353,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 3
+   },
+   {
+    "expression": "\\oint_{\\partial \\Omega} \\vec{E} \\cdot d\\vec{A} = \\frac{Q}{\\varepsilon_0}",
+    "markupLength": 402,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 1,
+    "scripts": 4
+   },
+   {
+    "expression": "\\begin{aligned} a &= b + c \\\\ d &= e - f \\end{aligned}",
+    "markupLength": 281,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 1,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\left[ \\begin{matrix} 1 & 0 \\\\ 0 & 1 \\end{matrix} \\right]",
+    "markupLength": 315,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 1,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\begin{cases} x^2 & x > 0 \\\\ 0 & x \\le 0 \\end{cases}",
+    "markupLength": 323,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 1,
+    "fractions": 0,
+    "scripts": 1
+   },
+   {
+    "expression": "{}^{238}_{92}\\mathrm{U}",
+    "markupLength": 182,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 1
+   },
+   {
+    "expression": "\\nabla \\times \\vec{B} = \\mu_0 \\vec{J}",
+    "markupLength": 285,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 2
+   },
+   {
+    "expression": "\\hat{H}\\psi = E\\psi",
+    "markupLength": 187,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\lim_{n \\to \\infty} \\left(1 + \\frac{1}{n}\\right)^n = e",
+    "markupLength": 436,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 1,
+    "scripts": 3
+   },
+   {
+    "expression": "\\mathbb{E}[X] = \\int x \\, dP",
+    "markupLength": 245,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\theta \\in [0, 2\\pi)",
+    "markupLength": 165,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\mathcal{O}(n \\log n)",
+    "markupLength": 148,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   }
+  ],
+  "renderedMathNodes": 2
+ },
+ "inventory": [
+  {
+   "module": "chat-mode",
+   "lines": 4274,
+   "bytes": 178186,
+   "files": [
+    {
+     "file": "client.js",
+     "lines": 4018
+    },
+    {
+     "file": "index.js",
+     "lines": 256
+    }
+   ]
+  },
+  {
+   "module": "superman",
+   "lines": 1988,
+   "bytes": 79879,
+   "files": [
+    {
+     "file": "client.js",
+     "lines": 1321
+    },
+    {
+     "file": "index.js",
+     "lines": 667
+    }
+   ]
+  },
+  {
+   "module": "arxiv-search",
+   "lines": 925,
+   "bytes": 36264,
+   "files": [
+    {
+     "file": "client.js",
+     "lines": 785
+    },
+    {
+     "file": "index.js",
+     "lines": 140
+    }
+   ]
+  }
+ ],
+ "suiteSizes": [
+  {
+   "suite": "chat-mode-check.mjs",
+   "purpose": "pipeline",
+   "lines": 446
+  },
+  {
+   "suite": "chat-mode-format-check.mjs",
+   "purpose": "rendering and decoding",
+   "lines": 264
+  },
+  {
+   "suite": "superman-host-check.mjs",
+   "purpose": "memory host half",
+   "lines": 200
+  },
+  {
+   "suite": "superman-check.mjs",
+   "purpose": "memory panel",
+   "lines": 349
+  },
+  {
+   "suite": "arxiv-smoke.mjs",
+   "purpose": "arXiv bundle",
+   "lines": 451
+  }
+ ],
+ "classification": [
+  {
+   "name": "paper.pdf",
+   "mime": "application/pdf",
+   "head": "%PDF-1.7",
+   "expected": "pdf",
+   "kind": "pdf"
+  },
+  {
+   "name": "shot.png",
+   "mime": "image/png",
+   "head": "\\x89PNG",
+   "expected": "image",
+   "kind": "image"
+  },
+  {
+   "name": "solver.py",
+   "mime": "",
+   "head": "#!/usr/bin/env python3",
+   "expected": "text",
+   "kind": "text"
+  },
+  {
+   "name": "notes.txt",
+   "mime": "text/plain",
+   "head": "会议纪要",
+   "expected": "text",
+   "kind": "text"
+  },
+  {
+   "name": "archive.zip",
+   "mime": "application/zip",
+   "head": "PK\\x03\\x04",
+   "expected": "unsupported",
+   "kind": "unsupported"
+  }
+ ]
+}

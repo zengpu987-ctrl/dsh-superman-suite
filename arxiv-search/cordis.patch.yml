@@ -1,0 +1,10 @@
+# Profile layer of the arXiv bundle: one Host row that registers the search
+# route the settings page calls, and whose browser half registers the settings
+# section itself.
+- insert:
+    - id: arxiv-search
+      name: '@local/dsh-arxiv'
+      config:
+        # arXiv asks every client for at most one request every three seconds.
+        minIntervalMs: 3000
+        requestTimeoutMs: 20000

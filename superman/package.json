@@ -1,0 +1,35 @@
+{
+  "name": "@local/dsh-superman",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Superman memory for the DeepSeek Harness Web UI: one smart folder in the sidebar where files and images uploaded in Harness mode or Chat mode are classified (PDF / images / code / other), where conversation and task records are kept, and which both modes recall while they think.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "icon": "./icon.svg",
+  "files": [
+    "index.js",
+    "client.js",
+    "icon.svg",
+    "cordis.patch.yml",
+    "locale/*.json"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  }
+}

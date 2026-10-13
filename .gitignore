@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+# editor
+.vscode/
+.idea/
+# node
+node_modules/
+*.log
+# python tooling
+__pycache__/
+.venv/
+# generated locally
+papers/data/*.local.json

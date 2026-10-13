@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Chat mode",
+    "description": "A ChatGPT-style conversation panel beside the agent, with saved conversation history, PDF / Mathematica notebook / image / text attachments, and a DeepSeek model plus thinking-effort picker. No tools, just chat."
+  }
+}

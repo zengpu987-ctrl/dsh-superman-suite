@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "arXiv search",
+    "description": "Search arXiv by id, title, author, abstract, keyword or category, with the venue facts arXiv records for each paper; every result can be saved to the Superman memory in one click."
+  }
+}
