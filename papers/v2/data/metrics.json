@@ -1,0 +1,992 @@
+{
+ "generatedAt": "2026-10-14T04:23:33+0800",
+ "generator": "papers/v2/tools/metrics.py",
+ "suites": [
+  {
+   "suite": "chat-mode-check.mjs",
+   "purpose": "pipeline: route, SSE, history, attachments, memory wiring",
+   "ok": 139,
+   "fail": 0,
+   "exitCode": 0,
+   "ms": 227,
+   "green": true,
+   "lines": 823,
+   "cwd": "dsh-superman-suite/v2",
+   "failures": []
+  },
+  {
+   "suite": "chat-mode-format-check.mjs",
+   "purpose": "rendering and decoding: LaTeX→MathML, Markdown, encodings",
+   "ok": 59,
+   "fail": 0,
+   "exitCode": 0,
+   "ms": 37,
+   "green": true,
+   "lines": 263,
+   "cwd": "dsh-superman-suite/v2",
+   "failures": []
+  },
+  {
+   "suite": "superman-host-check.mjs",
+   "purpose": "memory host half: extraction, BM25 recall, caps, reconciliation",
+   "ok": 70,
+   "fail": 1,
+   "exitCode": 1,
+   "ms": 432,
+   "green": false,
+   "lines": 501,
+   "cwd": "dsh-superman-suite/v2",
+   "failures": [
+    "FAIL  the host reader and the browser reader agree on all 0 real PDF(s) in papers/ —"
+   ]
+  },
+  {
+   "suite": "superman-check.mjs",
+   "purpose": "memory panel: entry, folders, preview, upload, notices",
+   "ok": 57,
+   "fail": 0,
+   "exitCode": 0,
+   "ms": 35,
+   "green": true,
+   "lines": 348,
+   "cwd": "dsh-superman-suite/v2",
+   "failures": []
+  },
+  {
+   "suite": "arxiv-smoke.mjs",
+   "purpose": "arXiv bundle including the bookmark path",
+   "ok": 52,
+   "fail": 0,
+   "exitCode": 0,
+   "ms": 51,
+   "green": true,
+   "lines": 450,
+   "cwd": "dsh-superman-suite/v2",
+   "failures": []
+  },
+  {
+   "suite": "superman-ocr-check.mjs",
+   "purpose": "OCR bundle: route, envelope, compile-on-first-use, real engine",
+   "ok": 71,
+   "fail": 0,
+   "exitCode": 0,
+   "ms": 3494,
+   "green": true,
+   "lines": 407,
+   "cwd": "dsh-superman-suite/v2",
+   "failures": []
+  }
+ ],
+ "suitesV1": [
+  {
+   "suite": "chat-mode-check.mjs",
+   "ok": 76,
+   "fail": 0,
+   "exitCode": 0,
+   "lines": 445
+  },
+  {
+   "suite": "chat-mode-format-check.mjs",
+   "ok": 59,
+   "fail": 0,
+   "exitCode": 0,
+   "lines": 263
+  },
+  {
+   "suite": "superman-host-check.mjs",
+   "ok": 39,
+   "fail": 0,
+   "exitCode": 0,
+   "lines": 199
+  },
+  {
+   "suite": "superman-check.mjs",
+   "ok": 57,
+   "fail": 0,
+   "exitCode": 0,
+   "lines": 348
+  },
+  {
+   "suite": "arxiv-smoke.mjs",
+   "ok": 52,
+   "fail": 0,
+   "exitCode": 0,
+   "lines": 450
+  }
+ ],
+ "factsSuites": {
+  "chat-mode-check.mjs": {
+   "v1": 77,
+   "v2": 139
+  },
+  "chat-mode-format-check.mjs": {
+   "v1": 59,
+   "v2": 59
+  },
+  "superman-host-check.mjs": {
+   "v1": 39,
+   "v2": 71
+  },
+  "superman-check.mjs": {
+   "v1": 57,
+   "v2": 57
+  },
+  "arxiv-smoke.mjs": {
+   "v1": 52,
+   "v2": 52
+  },
+  "superman-ocr-check.mjs": {
+   "v1": null,
+   "v2": 71
+  }
+ },
+ "factsSuitesSource": "FACTS §4 (recorded totals; the fresh runs above are the measurement)",
+ "suitesWithCorpus": {
+  "cwd": "/var/folders/dv/vn9lns4x1px2dwd9rtwx3j5w0000gn/T/v2-corpus-run-ii27t49v",
+  "corpusFiles": 10,
+  "ok": 71,
+  "fail": 0,
+  "exitCode": 0,
+  "green": true,
+  "failures": [],
+  "note": "the same suite with real PDFs in <cwd>/papers; proves the reader comparison itself passes"
+ },
+ "codeDelta": {
+  "commit": "52b99e6",
+  "files": [
+   {
+    "file": "chat-mode/client.js",
+    "v1": 4017,
+    "v2": 4281,
+    "delta": 264,
+    "new": false
+   },
+   {
+    "file": "chat-mode/index.js",
+    "v1": 255,
+    "v2": 255,
+    "delta": 0,
+    "new": false
+   },
+   {
+    "file": "superman/client.js",
+    "v1": 1320,
+    "v2": 1320,
+    "delta": 0,
+    "new": false
+   },
+   {
+    "file": "superman/index.js",
+    "v1": 666,
+    "v2": 908,
+    "delta": 242,
+    "new": false
+   },
+   {
+    "file": "superman/pdf.js",
+    "v1": null,
+    "v2": 799,
+    "delta": null,
+    "new": true
+   },
+   {
+    "file": "superman-ocr/index.js",
+    "v1": null,
+    "v2": 383,
+    "delta": null,
+    "new": true
+   },
+   {
+    "file": "tools/ocr-pdf.swift",
+    "v1": null,
+    "v2": 214,
+    "delta": null,
+    "new": true
+   },
+   {
+    "file": "arxiv-search/client.js",
+    "v1": 784,
+    "v2": 784,
+    "delta": 0,
+    "new": false
+   },
+   {
+    "file": "arxiv-search/index.js",
+    "v1": 139,
+    "v2": 139,
+    "delta": 0,
+    "new": false
+   }
+  ],
+  "moduleJsTotals": {
+   "v1": 7181,
+   "v2": 8869,
+   "delta": 1688
+  },
+  "factsBundle": {
+   "v1": 7187,
+   "v2": 8869,
+   "source": "FACTS §3 (bundle files, includes the extractor and OCR bundle)"
+  },
+  "verification": [
+   {
+    "suite": "chat-mode-check.mjs",
+    "v1": 445,
+    "v2": 823,
+    "new": false
+   },
+   {
+    "suite": "superman-host-check.mjs",
+    "v1": 199,
+    "v2": 501,
+    "new": false
+   },
+   {
+    "suite": "superman-ocr-check.mjs",
+    "v1": null,
+    "v2": 407,
+    "new": true
+   }
+  ],
+  "sourceSwiftLines": 214
+ },
+ "checkAttribution": {
+  "perSuite": [
+   {
+    "suite": "chat-mode-check.mjs",
+    "labelsV1": 66,
+    "labelsV2": 129,
+    "newLabels": 63,
+    "buckets": {
+     "L4": 12,
+     "other": 16,
+     "L3": 24,
+     "L1": 11
+    }
+   },
+   {
+    "suite": "chat-mode-format-check.mjs",
+    "labelsV1": 56,
+    "labelsV2": 56,
+    "newLabels": 0,
+    "buckets": {}
+   },
+   {
+    "suite": "superman-host-check.mjs",
+    "labelsV1": 29,
+    "labelsV2": 58,
+    "newLabels": 23,
+    "buckets": {
+     "L6": 10,
+     "L5": 9,
+     "L1": 1,
+     "L2": 2,
+     "other": 1
+    }
+   },
+   {
+    "suite": "superman-check.mjs",
+    "labelsV1": 55,
+    "labelsV2": 55,
+    "newLabels": 0,
+    "buckets": {}
+   },
+   {
+    "suite": "arxiv-smoke.mjs",
+    "labelsV1": 46,
+    "labelsV2": 46,
+    "newLabels": 0,
+    "buckets": {}
+   },
+   {
+    "suite": "superman-ocr-check.mjs",
+    "labelsV1": 0,
+    "labelsV2": 70,
+    "newLabels": 70,
+    "buckets": {
+     "L1": 70
+    }
+   }
+  ],
+  "totals": {
+   "L4": 12,
+   "other": 17,
+   "L3": 24,
+   "L1": 82,
+   "L6": 10,
+   "L5": 9,
+   "L2": 2
+  },
+  "note": "new check labels (static, from the suite sources) bucketed by keyword; runtime ok counts are in `suites`"
+ },
+ "limitations": [
+  {
+   "id": "L1",
+   "v1": "PDF extraction reads the text layer only; scans yield nothing",
+   "v2": "on-device OCR through macOS Vision, wired into the Chat upload path as an automatic fallback",
+   "status": "closed",
+   "effective": "client HMR + OCR bundle",
+   "figure": "FIG:ocr",
+   "table": "TAB:ocr",
+   "newChecks": 82
+  },
+  {
+   "id": "L2",
+   "v1": "recall was a flat additive lexical score that favoured long documents",
+   "v2": "BM25 (k1 = 1.2, b = 0.75) with IDF over name/body/record fields plus the recency term",
+   "status": "closed",
+   "effective": "host, restart",
+   "figure": "FIG:bm25",
+   "newChecks": 2
+  },
+  {
+   "id": "L3",
+   "v1": "conversation history lived in the page origin's localStorage",
+   "v2": "every finished turn also writes a restorable JSON payload (chatstate:<id>, ≤ 7 900 characters) that merges on start-up",
+   "status": "closed",
+   "effective": "client HMR",
+   "figure": "FIG:lifecycle",
+   "newChecks": 24
+  },
+  {
+   "id": "L4",
+   "v1": "images in history kept only a 160 px thumbnail and resent as unavailable",
+   "v2": "an image remembers the memory item id of its bytes; a resend fetches the original from the file route",
+   "status": "closed",
+   "effective": "client HMR",
+   "newChecks": 12
+  },
+  {
+   "id": "L5",
+   "v1": "the memory grew without a compaction policy",
+   "v2": "maxItems 2 000 and maxBytes 512 MiB caps, oldest-first eviction, start-up reconciliation, prune, eviction counters",
+   "status": "closed",
+   "effective": "host, restart",
+   "figure": "FIG:lifecycle",
+   "newChecks": 9
+  },
+  {
+   "id": "L6",
+   "v1": "panel uploads and Harness captures stored PDF bytes without text",
+   "v2": "superman/pdf.js, a Node port of the browser extractor, parses on store (200-page / 400 000-character caps)",
+   "status": "closed",
+   "effective": "host, restart",
+   "newChecks": 10
+  },
+  {
+   "id": "L7",
+   "v1": "no automated browser-level (DOM) end-to-end test",
+   "v2": "a workspace-local jsdom + React toolchain and tools/dom-check.mjs mount the panels with createRoot; environment differences remain",
+   "status": "partial",
+   "effective": "toolchain, not shipped",
+   "figure": "FIG:limitations",
+   "newChecks": 0
+  },
+  {
+   "id": "L8",
+   "v1": "recall is not semantic",
+   "v2": "no embedding service exists on this machine; retrieval stays lexical (now BM25), the seam is recall(q)",
+   "status": "open",
+   "effective": "—",
+   "newChecks": 0
+  }
+ ],
+ "api": [
+  {
+   "module": "superman",
+   "route": "/api/superman/api (+ GET /api/superman/file?id=)",
+   "action": "list",
+   "v1": true,
+   "status": "carried",
+   "note": "unchanged contract, stats now carry eviction counters"
+  },
+  {
+   "module": "superman",
+   "route": "/api/superman/api (+ GET /api/superman/file?id=)",
+   "action": "store",
+   "v1": true,
+   "status": "changed in v2",
+   "note": "PDF text is extracted on the host at store time"
+  },
+  {
+   "module": "superman",
+   "route": "/api/superman/api (+ GET /api/superman/file?id=)",
+   "action": "note",
+   "v1": true,
+   "status": "carried",
+   "note": "unchanged"
+  },
+  {
+   "module": "superman",
+   "route": "/api/superman/api (+ GET /api/superman/file?id=)",
+   "action": "get",
+   "v1": true,
+   "status": "carried",
+   "note": "unchanged contract, returns the extracted text"
+  },
+  {
+   "module": "superman",
+   "route": "/api/superman/api (+ GET /api/superman/file?id=)",
+   "action": "delete",
+   "v1": true,
+   "status": "carried",
+   "note": "unchanged"
+  },
+  {
+   "module": "superman",
+   "route": "/api/superman/api (+ GET /api/superman/file?id=)",
+   "action": "recall",
+   "v1": true,
+   "status": "changed in v2",
+   "note": "BM25 (k1 1.2, b 0.75) with IDF replaces the flat additive score"
+  },
+  {
+   "module": "superman",
+   "route": "/api/superman/api (+ GET /api/superman/file?id=)",
+   "action": "prune",
+   "v1": false,
+   "status": "new in v2",
+   "note": "manual compaction pass; returns what the policy removed"
+  },
+  {
+   "module": "superman-ocr",
+   "route": "/api/superman-ocr/api",
+   "action": "health",
+   "v1": false,
+   "status": "new in v2",
+   "note": "{ready, bin, compiled, version}"
+  },
+  {
+   "module": "superman-ocr",
+   "route": "/api/superman-ocr/api",
+   "action": "ocr",
+   "v1": false,
+   "status": "new in v2",
+   "note": "{text, pages, characters} from the Vision engine"
+  }
+ ],
+ "ocr": {
+  "facts": [
+   {
+    "case": "rasterised page A",
+    "pages": 1,
+    "layerChars": 0,
+    "ocrChars": 3411,
+    "ocrHan": 979,
+    "note": "single page rasterised to an image-only PDF; the layer is empty"
+   },
+   {
+    "case": "rasterised page B",
+    "pages": 1,
+    "layerChars": 1,
+    "ocrChars": 1341,
+    "ocrHan": 1072,
+    "note": "a one-character text layer; OCR recovers the Han text"
+   },
+   {
+    "case": "broken CMap brochure",
+    "pages": 19,
+    "layerChars": 9423,
+    "layerHan": 9,
+    "ocrChars": 11333,
+    "ocrHan": 66,
+    "note": "the embedded CMap is broken, so the layer returns Latin noise and 9 Han"
+   }
+  ],
+  "source": "FACTS §2",
+  "tool": "dsh-superman-suite/v2/tools/ocr-pdf.swift",
+  "compile": {
+   "ok": true,
+   "ms": 5266,
+   "stderr": ""
+  },
+  "remeasured": [
+   {
+    "case": "rasterised page A (Latin)",
+    "source": "tools/zotero-pdf2zh/test/attention.pdf",
+    "sourceBytes": 2215244,
+    "page": 1,
+    "dpi": 200,
+    "pages": 1,
+    "layerChars": 0,
+    "layerHan": 0,
+    "ms": 1470,
+    "exitCode": 0,
+    "chars": 2056,
+    "han": 0
+   },
+   {
+    "case": "rasterised page B (Han)",
+    "source": "tools/zotero-pdf2zh/server/translated/attention.no_watermark.zh-CN.mono.pdf",
+    "sourceBytes": 2481803,
+    "page": 2,
+    "dpi": 200,
+    "pages": 1,
+    "layerChars": 0,
+    "layerHan": 0,
+    "ms": 880,
+    "exitCode": 0,
+    "chars": 1376,
+    "han": 992
+   }
+  ]
+ },
+ "bm25": {
+  "query": "memory compaction",
+  "tokens": [
+   "memory",
+   "compaction"
+  ],
+  "corpus": [
+   {
+    "id": "a",
+    "label": "memory-annual-report.pdf",
+    "bodyLength": 295,
+    "terms": [
+     {
+      "token": "memory",
+      "frequency": 23
+     },
+     {
+      "token": "compaction",
+      "frequency": 0
+     }
+    ],
+    "flatScore": 6,
+    "flatRank": 1,
+    "bm25Score": 0.369,
+    "bm25Rank": 2
+   },
+   {
+    "id": "b",
+    "label": "policy-note.txt",
+    "bodyLength": 22,
+    "terms": [
+     {
+      "token": "memory",
+      "frequency": 1
+     },
+     {
+      "token": "compaction",
+      "frequency": 2
+     }
+    ],
+    "flatScore": 3,
+    "flatRank": 2,
+    "bm25Score": 1.539,
+    "bm25Rank": 1
+   }
+  ],
+  "idf": [
+   {
+    "token": "memory",
+    "documentFrequency": 2,
+    "documents": 2,
+    "idf": 0.1823215567939546
+   },
+   {
+    "token": "compaction",
+    "documentFrequency": 1,
+    "documents": 2,
+    "idf": 0.6931471805599453
+   }
+  ],
+  "rankFlip": true,
+  "flatWinner": "memory-annual-report.pdf",
+  "bm25Winner": "policy-note.txt"
+ },
+ "corpusV1": [
+  {
+   "name": "brochure.pdf",
+   "bytes": 1543450,
+   "medianMs": 38.9,
+   "characters": 9423,
+   "cjk": 9,
+   "noise": 0,
+   "pages": 19,
+   "note": "",
+   "charsPerPage": 496
+  },
+  {
+   "name": "document-B.pdf",
+   "bytes": 181639,
+   "medianMs": 7.9,
+   "characters": 786,
+   "cjk": 394,
+   "noise": 0,
+   "pages": 2,
+   "note": "",
+   "charsPerPage": 393
+  },
+  {
+   "name": "prospectus-2025.pdf",
+   "bytes": 590300,
+   "medianMs": 76.4,
+   "characters": 90938,
+   "cjk": 31791,
+   "noise": 0,
+   "pages": 56,
+   "note": "",
+   "charsPerPage": 1624
+  },
+  {
+   "name": "prospectus-2026.pdf",
+   "bytes": 580415,
+   "medianMs": 75.1,
+   "characters": 89764,
+   "cjk": 31252,
+   "noise": 0,
+   "pages": 54,
+   "note": "",
+   "charsPerPage": 1662
+  },
+  {
+   "name": "contract-2027.pdf",
+   "bytes": 208244,
+   "medianMs": 29,
+   "characters": 36611,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 8,
+   "note": "",
+   "charsPerPage": 4576
+  },
+  {
+   "name": "system-art-1.pdf",
+   "bytes": 7051,
+   "medianMs": 0.3,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-2.pdf",
+   "bytes": 22893,
+   "medianMs": 0.3,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-3.pdf",
+   "bytes": 18285,
+   "medianMs": 0.2,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-4.pdf",
+   "bytes": 21791,
+   "medianMs": 0.6,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-5.pdf",
+   "bytes": 21475,
+   "medianMs": 0.4,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-6.pdf",
+   "bytes": 32530,
+   "medianMs": 0.6,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-7.pdf",
+   "bytes": 31856,
+   "medianMs": 0.4,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-8.pdf",
+   "bytes": 21070,
+   "medianMs": 0.4,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  },
+  {
+   "name": "system-art-9.pdf",
+   "bytes": 21623,
+   "medianMs": 0.3,
+   "characters": 0,
+   "cjk": 0,
+   "noise": 0,
+   "pages": 0,
+   "note": "no-text",
+   "charsPerPage": 0
+  }
+ ],
+ "encodingsV1": [
+  {
+   "label": "UTF-8",
+   "expected": "utf-8",
+   "detected": "utf-8",
+   "correct": true,
+   "plausibility": 1.769
+  },
+  {
+   "label": "UTF-8 BOM",
+   "expected": "utf-8",
+   "detected": "utf-8",
+   "correct": true,
+   "plausibility": 1
+  },
+  {
+   "label": "GBK",
+   "expected": "gbk",
+   "detected": "gbk",
+   "correct": true,
+   "plausibility": 2.333
+  },
+  {
+   "label": "Big5",
+   "expected": "big5",
+   "detected": "big5",
+   "correct": true,
+   "plausibility": 3
+  },
+  {
+   "label": "UTF-16LE (no BOM)",
+   "expected": "utf-16le",
+   "detected": "utf-16le",
+   "correct": true,
+   "plausibility": 1.8
+  },
+  {
+   "label": "PNG header",
+   "expected": "binary",
+   "detected": "binary",
+   "correct": true,
+   "plausibility": 0
+  },
+  {
+   "label": "random high bytes",
+   "expected": "binary",
+   "detected": "binary",
+   "correct": true,
+   "plausibility": 0
+  }
+ ],
+ "mathV1": {
+  "battery": [
+   {
+    "expression": "E = mc^2",
+    "markupLength": 161,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 1
+   },
+   {
+    "expression": "\\frac{\\partial f}{\\partial x}",
+    "markupLength": 153,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 1,
+    "scripts": 0
+   },
+   {
+    "expression": "\\vec{F} = m\\vec{a}",
+    "markupLength": 229,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}",
+    "markupLength": 368,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 2,
+    "scripts": 3
+   },
+   {
+    "expression": "\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}",
+    "markupLength": 353,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 3
+   },
+   {
+    "expression": "\\oint_{\\partial \\Omega} \\vec{E} \\cdot d\\vec{A} = \\frac{Q}{\\varepsilon_0}",
+    "markupLength": 402,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 1,
+    "scripts": 4
+   },
+   {
+    "expression": "\\begin{aligned} a &= b + c \\\\ d &= e - f \\end{aligned}",
+    "markupLength": 281,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 1,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\left[ \\begin{matrix} 1 & 0 \\\\ 0 & 1 \\end{matrix} \\right]",
+    "markupLength": 315,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 1,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\begin{cases} x^2 & x > 0 \\\\ 0 & x \\le 0 \\end{cases}",
+    "markupLength": 323,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 1,
+    "fractions": 0,
+    "scripts": 1
+   },
+   {
+    "expression": "{}^{238}_{92}\\mathrm{U}",
+    "markupLength": 182,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 1
+   },
+   {
+    "expression": "\\nabla \\times \\vec{B} = \\mu_0 \\vec{J}",
+    "markupLength": 285,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 2
+   },
+   {
+    "expression": "\\hat{H}\\psi = E\\psi",
+    "markupLength": 187,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\lim_{n \\to \\infty} \\left(1 + \\frac{1}{n}\\right)^n = e",
+    "markupLength": 436,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 1,
+    "scripts": 3
+   },
+   {
+    "expression": "\\mathbb{E}[X] = \\int x \\, dP",
+    "markupLength": 245,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\theta \\in [0, 2\\pi)",
+    "markupLength": 165,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   },
+   {
+    "expression": "\\mathcal{O}(n \\log n)",
+    "markupLength": 148,
+    "valid": true,
+    "backslashLeak": false,
+    "tables": 0,
+    "fractions": 0,
+    "scripts": 0
+   }
+  ],
+  "renderedMathNodes": 2
+ },
+ "classificationV1": [
+  {
+   "name": "paper.pdf",
+   "mime": "application/pdf",
+   "head": "%PDF-1.7",
+   "expected": "pdf",
+   "kind": "pdf"
+  },
+  {
+   "name": "shot.png",
+   "mime": "image/png",
+   "head": "\\x89PNG",
+   "expected": "image",
+   "kind": "image"
+  },
+  {
+   "name": "solver.py",
+   "mime": "",
+   "head": "#!/usr/bin/env python3",
+   "expected": "text",
+   "kind": "text"
+  },
+  {
+   "name": "notes.txt",
+   "mime": "text/plain",
+   "head": "会议纪要",
+   "expected": "text",
+   "kind": "text"
+  },
+  {
+   "name": "archive.zip",
+   "mime": "application/zip",
+   "head": "PK\\x03\\x04",
+   "expected": "unsupported",
+   "kind": "unsupported"
+  }
+ ],
+ "v1Source": "papers/data/metrics.json (v1 measurement, reused verbatim)"
+}
